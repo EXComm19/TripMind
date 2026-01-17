@@ -16,11 +16,7 @@ struct EventCardView: View {
         return formatter
     }()
     
-    private let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "EEE, MMM d"
-        return formatter
-    }()
+    // ❌ DELETED: private let dateFormatter = ...
     
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -31,7 +27,7 @@ struct EventCardView: View {
                     .fill(eventTypeColor)
                     .frame(width: 12, height: 12)
                     .background(Circle().stroke(Color(UIColor.systemGroupedBackground), lineWidth: 4))
-                    .padding(.top, 4)
+                    .padding(.top, 28) // Aligns with the logo center
                 
                 Rectangle()
                     .fill(Color.timelineLine)
@@ -41,12 +37,9 @@ struct EventCardView: View {
             .frame(width: 20)
             
             // Content Column
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 0) {
                 
-                // Date Header
-                Text(dateFormatter.string(from: event.startTime).uppercased())
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(.secondary)
+                // ❌ DELETED: The "Date Header" Text block was here.
                 
                 // Card Box
                 VStack(alignment: .leading, spacing: 12) {
@@ -63,6 +56,7 @@ struct EventCardView: View {
                                 Text(displayTitle)
                                     .font(.system(size: 16, weight: .semibold))
                                     .lineLimit(1)
+                                    .foregroundColor(.primary)
                                 Spacer()
                                 // Time inside card
                                 Text(timeFormatter.string(from: event.startTime))
@@ -70,7 +64,6 @@ struct EventCardView: View {
                                     .foregroundColor(.primary)
                             }
                             
-                            // Subtitle: Hide for Car (since it's in body), Show for others
                             if !isCarEvent {
                                 Text(event.displayLocation)
                                     .font(.system(size: 12))
@@ -82,7 +75,6 @@ struct EventCardView: View {
                     
                     Divider().opacity(0.5)
                     
-                    // Specific Content
                     contentView.padding(.top, 4)
                 }
                 .padding(16)
@@ -90,6 +82,7 @@ struct EventCardView: View {
                 .cornerRadius(12)
                 .shadow(color: Color.black.opacity(0.05), radius: 3, x: 0, y: 1)
                 
+                // Spacer
                 Spacer().frame(height: 12)
             }
         }
@@ -154,7 +147,6 @@ struct FlightCardContent: View {
                 HStack(spacing: 4) {
                     Text(flight.departureAirport).font(.system(size: 20, weight: .bold))
                     if let term = flight.departureTerminal {
-                        // ✅ FIX: Check prefix before adding T
                         Text(formatTerminal(term)).font(.system(size: 20, weight: .bold)).foregroundColor(.secondary)
                     }
                 }
@@ -167,67 +159,41 @@ struct FlightCardContent: View {
                 HStack(spacing: 4) {
                     Text(flight.arrivalAirport).font(.system(size: 20, weight: .bold))
                     if let term = flight.arrivalTerminal {
-                        // ✅ FIX: Check prefix before adding T
                         Text(formatTerminal(term)).font(.system(size: 20, weight: .bold)).foregroundColor(.secondary)
                     }
                 }
                 Text(timeFormatter.string(from: flight.arrivalTime)).font(.subheadline).foregroundColor(.secondary)
             }
         }
+        .foregroundColor(.primary)
     }
     
-    // Helper to format terminal string
     func formatTerminal(_ term: String) -> String {
-        if term.uppercased().hasPrefix("T") || term.lowercased().contains("terminal") {
-            return term
-        }
+        if term.uppercased().hasPrefix("T") || term.lowercased().contains("terminal") { return term }
         return "T\(term)"
     }
 }
 
-// ✅ UPDATED CAR CARD CONTENT (Vertical Layout)
 struct CarCardContent: View {
     let car: CarData
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Origin (Line 1)
             HStack(alignment: .top, spacing: 8) {
-                Image(systemName: "circle.fill")
-                    .font(.system(size: 8))
-                    .foregroundColor(.green)
-                    .padding(.top, 4)
-                Text(car.origin)
-                    .font(.subheadline)
-                    .fixedSize(horizontal: false, vertical: true)
+                Image(systemName: "circle.fill").font(.system(size: 8)).foregroundColor(.green).padding(.top, 4)
+                Text(car.origin).font(.subheadline).fixedSize(horizontal: false, vertical: true)
             }
-            
-            // Destination (Line 2)
             HStack(alignment: .top, spacing: 8) {
-                Image(systemName: "circle.fill")
-                    .font(.system(size: 8))
-                    .foregroundColor(.red)
-                    .padding(.top, 4)
-                Text(car.destination ?? "Unknown Destination")
-                    .font(.subheadline)
-                    .fixedSize(horizontal: false, vertical: true)
+                Image(systemName: "circle.fill").font(.system(size: 8)).foregroundColor(.red).padding(.top, 4)
+                Text(car.destination ?? "Unknown Destination").font(.subheadline).fixedSize(horizontal: false, vertical: true)
             }
-            
-            Divider()
-            
-            // Footer (Plate)
+            Divider().background(Color.gray.opacity(0.3))
             HStack {
-                Text(car.carPlate ?? "No Plate")
-                    .font(.caption).bold()
-                    .padding(4)
-                    .background(Color.gray.opacity(0.1))
-                    .cornerRadius(4)
-                
+                Text(car.carPlate ?? "No Plate").font(.caption).bold().padding(4).background(Color(UIColor.tertiarySystemFill)).cornerRadius(4)
                 Spacer()
-                if let driver = car.driver {
-                    Text(driver).font(.caption).foregroundColor(.secondary)
-                }
+                if let driver = car.driver { Text(driver).font(.caption).foregroundColor(.secondary) }
             }
         }
+        .foregroundColor(.primary)
     }
 }
 
@@ -253,10 +219,11 @@ struct HotelCardContent: View {
                 Text(hotel.numberOfNights)
                     .font(.caption).bold()
                     .padding(6)
-                    .background(Color.blue.opacity(0.1))
+                    .background(Color.blue.opacity(0.2))
                     .cornerRadius(6)
             }
         }
+        .foregroundColor(.primary)
     }
 }
 
@@ -277,5 +244,6 @@ struct TrainCardContent: View {
                 Text(timeFormatter.string(from: train.arrivalTime)).font(.subheadline).foregroundColor(.secondary)
             }
         }
+        .foregroundColor(.primary)
     }
 }

@@ -97,7 +97,6 @@ struct TripDetailView: View {
                                             .padding(.bottom, 12)
                                         
                                     case .event(let event):
-                                        // Uses EventCardView from EventCardView.swift
                                         EventCardView(event: event)
                                             .padding(.horizontal, 20)
                                             .contentShape(Rectangle())
@@ -268,19 +267,32 @@ struct TripTimelineProvider {
         let sortedEvents = events.sorted { $0.startTime < $1.startTime }
         var combinedItems: [TimelineItem] = []
         
+        // 1. Add ALL Events to the list
+        for event in sortedEvents {
+            combinedItems.append(TimelineItem(dateForSorting: event.startTime, content: .event(event)))
+        }
+        
+        // 2. Identify Hotel Stays (for header/footer logic)
         let hotelEvents = sortedEvents.filter { $0.type == .hotel }
         
-        for (index, event) in sortedEvents.enumerated() {
-            combinedItems.append(TimelineItem(dateForSorting: event.startTime, content: .event(event)))
-            
-            if index < sortedEvents.count - 1 {
-                let nextEvent = sortedEvents[index + 1]
-                if let endDate = event.endTime,
-                   isTransport(event.type), isTransport(nextEvent.type) {
+        // 3. Connection Logic (✅ FIXED: Filter ONLY Transport events)
+        // We do this separately so Hotels don't break the chain between Flight A and Flight B
+        let transportEvents = sortedEvents.filter { isTransport($0.type) }
+        
+        for (index, event) in transportEvents.enumerated() {
+            // Check next TRANSPORT event
+            if index < transportEvents.count - 1 {
+                let nextEvent = transportEvents[index + 1]
+                
+                if let endDate = event.endTime {
                     let layover = nextEvent.startTime.timeIntervalSince(endDate)
+                    
+                    // Connection must be positive and less than 24 hours
                     if layover > 0 && layover < (24 * 3600) {
                         var loc = "Layover"
                         if case .flight(let f) = event.data { loc = "at \(f.arrivalAirport)" }
+                        
+                        // Insert connection pill slightly after the first flight arrives
                         combinedItems.append(TimelineItem(
                             dateForSorting: endDate.addingTimeInterval(1),
                             content: .connection(durationStr: formatDuration(layover), airportMsg: loc)
@@ -290,18 +302,21 @@ struct TripTimelineProvider {
             }
         }
         
+        // 4. Group by Day
         let groupedDict = Dictionary(grouping: combinedItems) { Calendar.current.startOfDay(for: $0.dateForSorting) }
         let allDates = groupedDict.keys.sorted()
         
         return allDates.map { date -> DaySchedule in
             var items = groupedDict[date]!.sorted { $0.dateForSorting < $1.dateForSorting }
             
+            // --- STRICT ORDERING LOGIC ---
             var breakfastItems: [TimelineItem] = []
             var checkoutItems: [TimelineItem] = []
             var eventItems: [TimelineItem] = []
             var hotelCheckInItems: [TimelineItem] = []
             var stayingItems: [TimelineItem] = []
             
+            // Distribute items into buckets
             for item in items {
                 if case .event(let e) = item.content, e.type == .hotel {
                     hotelCheckInItems.append(item)
@@ -310,6 +325,7 @@ struct TripTimelineProvider {
                 }
             }
             
+            // Morning Logic: Breakfast & Checkout
             if let activeMorningHotel = hotelEvents.first(where: {
                 if let checkIn = $0.startTime as Date?, let checkOut = $0.endTime {
                     let startDay = Calendar.current.startOfDay(for: checkIn)
@@ -328,6 +344,7 @@ struct TripTimelineProvider {
                 }
             }
             
+            // Night Logic: Staying
             if let activeNightHotel = hotelEvents.first(where: {
                 if let checkIn = $0.startTime as Date?, let checkOut = $0.endTime {
                     let startDay = Calendar.current.startOfDay(for: checkIn)
@@ -339,6 +356,8 @@ struct TripTimelineProvider {
                 stayingItems.append(TimelineItem(dateForSorting: date, content: .staying(hotelName: activeNightHotel.displayTitle)))
             }
             
+            // Combine in Strict Order
+            // Note: 'eventItems' now contains both TravelEvents (Flight/Train) AND Connection Pills, sorted by time.
             let finalItems = breakfastItems + checkoutItems + eventItems + hotelCheckInItems + stayingItems
             return DaySchedule(date: date, items: finalItems)
         }
