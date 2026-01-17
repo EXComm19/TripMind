@@ -6,69 +6,108 @@
 //
 
 import SwiftUI
-import MapKit
+import UniformTypeIdentifiers
 
 // MARK: - Main View
 struct TripDetailView: View {
-    let trip: Trip
-    @State private var mapCameraPosition: MapCameraPosition = .automatic
+    @EnvironmentObject var tripStore: TripStore
+    @State var trip: Trip
     
-    // Processed timeline data
+    // MARK: - State
+    @State private var showingDocumentPicker = false
+    @State private var showingImagePicker = false
+    @State private var showingTextInputSheet = false
+    @State private var eventToEdit: TravelEvent?
+    
+    @State private var pastedText: String = ""
+    @State private var isParsing = false
+    @State private var parsingError: String?
+    @State private var showPasteSuccess = false
+    
+    private let geminiClient = GeminiAPIClient()
+    
     private var timelineDays: [TripTimelineProvider.DaySchedule] {
         TripTimelineProvider.processTimeline(events: trip.events)
     }
     
-    // Processed map routes with curves
-    private var routedPolylines: [MapCurveProvider.RoutedPolyline] {
-        MapCurveProvider.generateCurves(for: trip.events)
+    init(trip: Trip) {
+        _trip = State(initialValue: trip)
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                // MARK: Header Map
-                Map(position: $mapCameraPosition) {
-                    // Draw curved route lines
-                    ForEach(routedPolylines) { route in
-                        MapPolyline(coordinates: route.coordinates)
-                            .stroke(route.color, lineWidth: 3)
+        ZStack(alignment: .bottom) {
+            ScrollView {
+                LazyVStack(spacing: 0, pinnedViews: []) {
+                    
+                    if isParsing {
+                        VStack(spacing: 12) {
+                            ProgressView().scaleEffect(1.2)
+                            Text("Analyzing itinerary...").font(.subheadline).foregroundColor(.secondary)
+                        }
+                        .padding(30)
                     }
                     
-                    // Draw markers
-                    ForEach(trip.events.compactMap { $0.geoCoordinates != nil ? $0 : nil }) { event in
-                        let coord = CLLocationCoordinate2D(latitude: event.geoCoordinates!.lat, longitude: event.geoCoordinates!.lng)
-                        Marker(event.displayTitle, systemImage: event.type.symbolName, coordinate: coord)
-                            .tint(eventTypeColor(event.type))
+                    if let error = parsingError {
+                        HStack {
+                            Image(systemName: "exclamationmark.triangle.fill").foregroundColor(.red)
+                            Text(error).font(.caption).foregroundColor(.red)
+                            Spacer()
+                            Button { parsingError = nil } label: { Image(systemName: "xmark") }
+                        }
+                        .padding()
+                        .background(Color.red.opacity(0.1))
+                        .cornerRadius(12)
+                        .padding()
                     }
-                }
-                .frame(height: 300)
-                .mapStyle(.standard(elevation: .realistic))
-                
-                // MARK: Timeline Content
-                LazyVStack(spacing: 25, pinnedViews: []) {
-                    ForEach(timelineDays) { daySchedule in
-                        VStack(alignment: .leading, spacing: 15) {
-                            // --- Main Date Header per Day ---
-                            Text(daySchedule.date.formatted(date: .complete, time: .omitted))
-                                .font(.title3)
-                                .fontWeight(.bold)
-                                .foregroundColor(.primary)
-                                .padding(.horizontal)
-                                .padding(.top, 10)
-                            
-                            // --- Timeline Items for this Day ---
-                            VStack(spacing: 0) {
+                    
+                    if trip.events.isEmpty && !isParsing {
+                        VStack(spacing: 16) {
+                            Image(systemName: "airplane.departure")
+                                .font(.system(size: 48))
+                                .foregroundColor(.gray.opacity(0.5))
+                            Text("No events yet")
+                                .font(.title3).fontWeight(.semibold)
+                            Text("Tap the + button to import your itinerary.")
+                                .font(.subheadline).foregroundColor(.secondary)
+                        }
+                        .padding(.top, 60)
+                    } else {
+                        // MARK: - Timeline Render
+                        ForEach(timelineDays) { daySchedule in
+                            VStack(alignment: .leading, spacing: 0) {
+                                
+                                // Day Header
+                                Text(daySchedule.date.formatted(.dateTime.weekday().month().day()))
+                                    .font(.subheadline)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.secondary)
+                                    .textCase(.uppercase)
+                                    .padding(.horizontal, 20)
+                                    .padding(.top, 24)
+                                    .padding(.bottom, 12)
+                                
+                                // Items
                                 ForEach(daySchedule.items) { item in
                                     switch item.content {
-                                    case .event(let event):
-                                        EventRowView(event: event, showDateHeader: false)
-                                            .padding(.bottom, 4) // Small gap between cards
-                                        
-                                    case .connection(let duration, let airportMsg):
-                                        ConnectionIndicatorView(durationStr: duration, message: airportMsg)
+                                    case .breakfast(let hotelName):
+                                        BreakfastHeaderView(hotelName: hotelName)
                                         
                                     case .checkoutHint(let hotelName):
                                         CheckoutHintView(hotelName: hotelName)
+                                            .padding(.bottom, 12)
+                                        
+                                    case .event(let event):
+                                        // Uses EventCardView from EventCardView.swift
+                                        EventCardView(event: event)
+                                            .padding(.horizontal, 20)
+                                            .contentShape(Rectangle())
+                                            .onTapGesture { eventToEdit = event }
+                                        
+                                    case .connection(let duration, let msg):
+                                        ConnectionIndicatorView(durationStr: duration, message: msg)
+                                        
+                                    case .staying(let hotelName):
+                                        StayingFooterView(hotelName: hotelName)
                                             .padding(.bottom, 12)
                                     }
                                 }
@@ -76,214 +115,140 @@ struct TripDetailView: View {
                         }
                     }
                 }
-                .padding(.vertical)
+                .padding(.bottom, 100)
+            }
+            
+            // Toast
+            if showPasteSuccess {
+                Text("Clipboard content pasted!")
+                    .font(.caption).bold()
+                    .padding()
+                    .background(.thinMaterial)
+                    .cornerRadius(20)
+                    .padding(.bottom, 40)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
+        .background(Color(UIColor.systemGroupedBackground))
         .navigationTitle(trip.name)
         .navigationBarTitleDisplayMode(.inline)
-        .background(Color(UIColor.systemGroupedBackground))
-    }
-    
-    private func eventTypeColor(_ type: EventType) -> Color {
-        switch type {
-        case .flight: return .blue
-        case .train: return .orange
-        case .car: return .green
-        case .hotel: return .purple
-        case .transport: return .mint
-        case .activity, .other: return .gray
-        }
-    }
-}
-
-// MARK: - UI Sub-Components
-
-// A specific view for the "5h 15m at PVG" style connection indicator
-struct ConnectionIndicatorView: View {
-    let durationStr: String
-    let message: String
-    
-    var body: some View {
-        HStack {
-            // Left dotted line
-            VStack { DottedLine() }.frame(height: 30)
-            
-            // The pill
-            HStack(spacing: 4) {
-                Text(durationStr)
-                    .fontWeight(.semibold)
-                Text(message)
-                    .foregroundStyle(.secondary)
-            }
-            .font(.caption)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(Capsule().fill(Color(UIColor.tertiarySystemFill)))
-            
-            // Right dotted line
-            VStack { DottedLine() }.frame(height: 30)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 4)
-    }
-}
-
-// A simple vertical dotted line shape
-struct DottedLine: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: CGPoint(x: rect.midX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.midX, y: rect.maxY))
-        return path
-    }
-    
-    func path(in rect: CGRect, style: StrokeStyle) -> some Shape {
-        var newStyle = style
-        newStyle.dash = [4, 4] // dash pattern
-        return strokedPath(newStyle)
-    }
-}
-
-// The view for "Check out from Hotel Name"
-struct CheckoutHintView: View {
-    let hotelName: String
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "bed.double.circle")
-                .font(.title2)
-                .foregroundColor(.purple)
-            
-            VStack(alignment: .leading) {
-                Text("Check out")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.primary)
-                Text("from \(hotelName)")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            Spacer()
-        }
-        .padding(.horizontal)
-        .padding(.vertical, 8)
-        // Styling roughly matching hotel card vibe but subtler
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color(UIColor.secondarySystemGroupedBackground).opacity(0.5)))
-        .padding(.horizontal)
-    }
-}
-
-// Update existing EventRowView to optionally hide the date
-struct EventRowView: View {
-    let event: Event
-    var showDateHeader: Bool = true // Default to true for backward compatibility if needed elsewhere
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if showDateHeader {
-                Text(event.startDate.formatted(date: .abbreviated, time: .omitted))
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-            }
-
-            HStack(alignment: .top, spacing: 12) {
-                // Icon Column
-                VStack {
-                    Image(systemName: event.type.symbolName)
-                        .font(.title2)
-                        .foregroundColor(eventTypeColor(event.type))
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Menu {
+                    Section {
+                        Button { showingDocumentPicker = true } label: { Label("Import PDF", systemImage: "doc.text") }
+                        Button { showingImagePicker = true } label: { Label("Import Image", systemImage: "photo") }
+                    }
+                    Section {
+                        Button { showingTextInputSheet = true } label: { Label("Enter Text", systemImage: "square.and.pencil") }
+                        Button { parseFromClipboard() } label: { Label("Paste from Clipboard", systemImage: "doc.on.clipboard") }
+                    }
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 16, weight: .semibold))
                         .frame(width: 32, height: 32)
-                        .background(eventTypeColor(event.type).opacity(0.1))
+                        .background(Color(UIColor.tertiarySystemFill))
                         .clipShape(Circle())
-
-                    // Connector Line (visual only, simple version)
-                    if !isHotel(event.type) {
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.3))
-                            .frame(width: 2)
-                            .padding(.top, 4)
-                        Spacer()
-                    }
-                }
-                .frame(height: isHotel(event.type) ? 40 : 100) // shorter for single-point items
-
-                // Content Column
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text(event.title)
-                            .font(.headline)
-                        Spacer()
-                        if isHotel(event.type), let end = event.endDate {
-                            // Calculate nights for hotels
-                            let nights = Calendar.current.dateComponents([.day], from: event.startDate, to: end).day ?? 0
-                            Text("\(nights) night\(nights > 1 ? "s" : "")")
-                                .font(.caption)
-                                .fontWeight(.bold)
-                                .padding(4)
-                                .background(Color.gray.opacity(0.1))
-                                .cornerRadius(4)
-                        }
-                    }
-
-                    // Location/Subtitle
-                    if case .flight(let f) = event.data {
-                        Text("\(f.departureAirport) → \(f.arrivalAirport)")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    } else if case .hotel(let h) = event.data {
-                         Text(h.address.isEmpty ? h.hotelName : h.address)
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-                    }
-
-                    // Times
-                    HStack {
-                        Text(event.startDate.formatted(date: .omitted, time: .shortened))
-                        if let endDate = event.endDate {
-                            Image(systemName: "arrow.right")
-                                .font(.caption2)
-                            Text(endDate.formatted(date: .omitted, time: .shortened))
-                                // Add +1 day indicator if needed
-                                if !Calendar.current.isDate(event.startDate, inSameDayAs: endDate) {
-                                    Text("+1").font(.caption2).baselineOffset(4)
-                                }
-                        }
-                    }
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .padding(.top, 2)
                 }
             }
-            .padding()
-            .background(Color(UIColor.secondarySystemGroupedBackground))
-            .cornerRadius(16)
         }
-        .padding(.horizontal)
-    }
-
-    private func isHotel(_ type: EventType) -> Bool {
-        return type == .hotel
+        .sheet(item: $eventToEdit) { event in
+            EditEventSheet(event: event) { saveUpdatedEvent($0) }
+        }
+        .sheet(isPresented: $showingDocumentPicker) { DocumentPicker(onPick: handlePickedDocuments) }
+        .sheet(isPresented: $showingImagePicker) { ImagePicker(onPick: handlePickedImage) }
+        .sheet(isPresented: $showingTextInputSheet) {
+            TextInputSheet(text: $pastedText) { showingTextInputSheet = false; parsePastedText() }
+        }
+        .onReceive(tripStore.$trips) { updatedTrips in
+            if let updated = updatedTrips.first(where: { $0.id == trip.id }) { self.trip = updated }
+        }
     }
     
-    private func eventTypeColor(_ type: EventType) -> Color {
-        switch type {
-        case .flight: return .blue
-        case .train: return .orange
-        case .car: return .green
-        case .hotel: return .purple
-        case .transport: return .mint
-        case .activity, .other: return .gray
+    // MARK: - Handlers
+    private func saveUpdatedEvent(_ updatedEvent: TravelEvent) {
+        if let index = trip.events.firstIndex(where: { $0.id == updatedEvent.id }) {
+            var newTrip = trip
+            newTrip.events[index] = updatedEvent
+            newTrip.events.sort { $0.startTime < $1.startTime }
+            self.trip = newTrip
+            Task { try? await tripStore.updateTrip(self.trip) }
+        }
+    }
+    
+    private func parseFromClipboard() {
+        if let string = UIPasteboard.general.string {
+            self.pastedText = string
+            self.showPasteSuccess = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { withAnimation { self.showPasteSuccess = false } }
+            parsePastedText()
+        } else { parsingError = "Clipboard is empty" }
+    }
+    
+    private func parsePastedText() {
+        guard !pastedText.isEmpty else { return }
+        isParsing = true; parsingError = nil
+        Task {
+            do {
+                let parsed = try await geminiClient.parseText(pastedText)
+                appendEvents(parsed)
+                DispatchQueue.main.async { self.pastedText = "" }
+            } catch { handleError(error) }
+        }
+    }
+    
+    private func handlePickedDocuments(urls: [URL]) {
+        guard let url = urls.first else { return }
+        isParsing = true; parsingError = nil
+        Task {
+            do {
+                if url.pathExtension.lowercased() == "pdf" {
+                    let data = try Data(contentsOf: url)
+                    let parsed = try await geminiClient.parsePDF(data)
+                    appendEvents(parsed)
+                } else if let image = UIImage(contentsOfFile: url.path) {
+                    let parsed = try await geminiClient.parseImage(image)
+                    appendEvents(parsed)
+                }
+            } catch { handleError(error) }
+        }
+    }
+    
+    private func handlePickedImage(image: UIImage?) {
+        guard let image = image else { return }
+        isParsing = true; parsingError = nil
+        Task {
+            do {
+                let parsed = try await geminiClient.parseImage(image)
+                appendEvents(parsed)
+            } catch { handleError(error) }
+        }
+    }
+    
+    @MainActor
+    private func appendEvents(_ newEvents: [TravelEvent]) {
+        self.trip.events.append(contentsOf: newEvents)
+        self.trip.events.sort { $0.startTime < $1.startTime }
+        Task { try? await tripStore.updateTrip(self.trip) }
+        self.isParsing = false
+    }
+    
+    private func handleError(_ error: Error) {
+        DispatchQueue.main.async {
+            self.parsingError = error.localizedDescription
+            self.isParsing = false
         }
     }
 }
 
-// MARK: - Helper: Timeline Processor Logic
-// This handles the complex business logic of arranging the timeline items.
+// MARK: - Timeline Logic
+
 struct TripTimelineProvider {
-    
     enum TimelineItemContent {
-        case event(Event)
+        case event(TravelEvent)
         case connection(durationStr: String, airportMsg: String)
+        case breakfast(hotelName: String)
+        case staying(hotelName: String)
         case checkoutHint(hotelName: String)
     }
     
@@ -299,229 +264,193 @@ struct TripTimelineProvider {
         var items: [TimelineItem]
     }
     
-    static func processTimeline(events: [Event]) -> [DaySchedule] {
-        let sortedEvents = events.sorted { $0.startDate < $1.startDate }
+    static func processTimeline(events: [TravelEvent]) -> [DaySchedule] {
+        let sortedEvents = events.sorted { $0.startTime < $1.startTime }
         var combinedItems: [TimelineItem] = []
         
-        // 1. Generate Events and Connection Indicators
+        let hotelEvents = sortedEvents.filter { $0.type == .hotel }
+        
         for (index, event) in sortedEvents.enumerated() {
-            // Add the actual event
-            combinedItems.append(TimelineItem(dateForSorting: event.startDate, content: .event(event)))
+            combinedItems.append(TimelineItem(dateForSorting: event.startTime, content: .event(event)))
             
-            // Check for connection to the *next* event
             if index < sortedEvents.count - 1 {
                 let nextEvent = sortedEvents[index + 1]
-                
-                // Only connect transport types (flight/train etc)
-                if isTransport(event.type) && isTransport(nextEvent.type),
-                   let endDate = event.endDate {
-                    let layover = nextEvent.startDate.timeIntervalSince(endDate)
-                    
-                    // If layover is positive and less than 24 hours, add indicator
+                if let endDate = event.endTime,
+                   isTransport(event.type), isTransport(nextEvent.type) {
+                    let layover = nextEvent.startTime.timeIntervalSince(endDate)
                     if layover > 0 && layover < (24 * 3600) {
-                        let durationStr = formatDuration(layover)
-                        // Try to get airport code from previous event data
-                        var locationMsg = "connecting"
-                        if case .flight(let f) = event.data {
-                            locationMsg = "at \(f.arrivalAirport)"
-                        }
-                        
-                        // Add connection item slightly after the first event ends so it sorts correctly
+                        var loc = "Layover"
+                        if case .flight(let f) = event.data { loc = "at \(f.arrivalAirport)" }
                         combinedItems.append(TimelineItem(
                             dateForSorting: endDate.addingTimeInterval(1),
-                            content: .connection(durationStr: durationStr, airportMsg: locationMsg)
+                            content: .connection(durationStr: formatDuration(layover), airportMsg: loc)
                         ))
                     }
                 }
             }
         }
         
-        // 2. Generate Checkout Hints based on Hotel events
-        for event in sortedEvents where event.type == .hotel {
-            if let endDate = event.endDate {
-                // Add checkout hint at the start of the end date day
-                let startOfDay = Calendar.current.startOfDay(for: endDate)
-                combinedItems.append(TimelineItem(
-                    dateForSorting: startOfDay,
-                    content: .checkoutHint(hotelName: event.title)
-                ))
-            }
-        }
+        let groupedDict = Dictionary(grouping: combinedItems) { Calendar.current.startOfDay(for: $0.dateForSorting) }
+        let allDates = groupedDict.keys.sorted()
         
-        // 3. Group by Day
-        let groupedDict = Dictionary(grouping: combinedItems) { item in
-            Calendar.current.startOfDay(for: item.dateForSorting)
-        }
-        
-        // 4. Create sorted DaySchedules and handle Hotel sequencing rule
-        let sortedDays = groupedDict.keys.sorted().map { date -> DaySchedule in
-            var itemsForDay = groupedDict[date]!.sorted { $0.dateForSorting < $1.dateForSorting }
+        return allDates.map { date -> DaySchedule in
+            var items = groupedDict[date]!.sorted { $0.dateForSorting < $1.dateForSorting }
             
-            // Rule: Hotel Check-in cards must be at the bottom of the day
-            // Split items into non-hotels and hotels
-            var otherItems: [TimelineItem] = []
-            var hotelCheckIns: [TimelineItem] = []
+            var breakfastItems: [TimelineItem] = []
+            var checkoutItems: [TimelineItem] = []
+            var eventItems: [TimelineItem] = []
+            var hotelCheckInItems: [TimelineItem] = []
+            var stayingItems: [TimelineItem] = []
             
-            for item in itemsForDay {
+            for item in items {
                 if case .event(let e) = item.content, e.type == .hotel {
-                    // It's a hotel check-in event
-                    hotelCheckIns.append(item)
+                    hotelCheckInItems.append(item)
                 } else {
-                    otherItems.append(item)
+                    eventItems.append(item)
                 }
             }
             
-            // Recombine: others first, hotels last
-            itemsForDay = otherItems + hotelCheckIns
+            if let activeMorningHotel = hotelEvents.first(where: {
+                if let checkIn = $0.startTime as Date?, let checkOut = $0.endTime {
+                    let startDay = Calendar.current.startOfDay(for: checkIn)
+                    let endDay = Calendar.current.startOfDay(for: checkOut)
+                    return date > startDay && date <= endDay
+                }
+                return false
+            }) {
+                if case .hotel(let h) = activeMorningHotel.data, h.isBreakfastIncluded == true {
+                    breakfastItems.append(TimelineItem(dateForSorting: date, content: .breakfast(hotelName: h.hotelName)))
+                }
+                if let checkOut = activeMorningHotel.endTime, Calendar.current.isDate(date, inSameDayAs: checkOut) {
+                   if !Calendar.current.isDate(activeMorningHotel.startTime, inSameDayAs: checkOut) {
+                       checkoutItems.append(TimelineItem(dateForSorting: checkOut, content: .checkoutHint(hotelName: activeMorningHotel.displayTitle)))
+                   }
+                }
+            }
             
-            return DaySchedule(date: date, items: itemsForDay)
+            if let activeNightHotel = hotelEvents.first(where: {
+                if let checkIn = $0.startTime as Date?, let checkOut = $0.endTime {
+                    let startDay = Calendar.current.startOfDay(for: checkIn)
+                    let endDay = Calendar.current.startOfDay(for: checkOut)
+                    return date >= startDay && date < endDay
+                }
+                return false
+            }) {
+                stayingItems.append(TimelineItem(dateForSorting: date, content: .staying(hotelName: activeNightHotel.displayTitle)))
+            }
+            
+            let finalItems = breakfastItems + checkoutItems + eventItems + hotelCheckInItems + stayingItems
+            return DaySchedule(date: date, items: finalItems)
         }
-        
-        return sortedDays
     }
     
-    private static func isTransport(_ type: EventType) -> Bool {
-        return type == .flight || type == .train || type == .transport
+    static func isTransport(_ type: EventType) -> Bool {
+        type == .flight || type == .train || type == .transport
     }
     
-    private static func formatDuration(_ interval: TimeInterval) -> String {
-        let hours = Int(interval) / 3600
-        let minutes = Int(interval) % 3600 / 60
-        if hours > 0 {
-            return "\(hours)h \(minutes)m"
-        } else {
-            return "\(minutes)m"
-        }
+    static func formatDuration(_ i: TimeInterval) -> String {
+        let h = Int(i) / 3600, m = Int(i) % 3600 / 60
+        return h > 0 ? "\(h)h \(m)m" : "\(m)m"
     }
 }
 
+// MARK: - Subviews
 
-// MARK: - Helper: Map Curve Calculation
-// This handles generating curved geometry for overlapping routes.
-struct MapCurveProvider {
-    
-    struct RoutedPolyline: Identifiable {
-        let id = UUID()
-        let coordinates: [CLLocationCoordinate2D]
-        let color: Color
-    }
-    
-    // Helper to identify unique paths regardless of direction (A->B is same as B->A)
-    struct RouteKey: Hashable {
-        let p1: String
-        let p2: String
-        init(c1: CLLocationCoordinate2D, c2: CLLocationCoordinate2D) {
-            // Create a consistent string key by sorting coordinates roughly
-            let s1 = "\(String(format: "%.4f", c1.latitude)),\(String(format: "%.4f", c1.longitude))"
-            let s2 = "\(String(format: "%.4f", c2.latitude)),\(String(format: "%.4f", c2.longitude))"
-            if s1 < s2 { p1 = s1; p2 = s2 } else { p1 = s2; p2 = s1 }
-        }
-    }
-    
-    static func generateCurves(for events: [Event]) -> [RoutedPolyline] {
-        var routeCounts: [RouteKey: Int] = [:]
-        var polylines: [RoutedPolyline] = []
-        
-        let journeyEvents = events.filter { $0.destinationGeoCoordinates != nil }
-        
-        // 1. Count repetitions of specific routes
-        for event in journeyEvents {
-            guard let start = event.geoCoordinates, let end = event.destinationGeoCoordinates else { continue }
-            let startCoord = CLLocationCoordinate2D(latitude: start.lat, longitude: start.lng)
-            let endCoord = CLLocationCoordinate2D(latitude: end.lat, longitude: end.lng)
-            
-            // Don't route if start/end are basically the same
-            if abs(start.lat - end.lat) < 0.001 && abs(start.lng - end.lng) < 0.001 { continue }
-            
-            let key = RouteKey(c1: startCoord, c2: endCoord)
-            routeCounts[key, default: 0] += 1
-        }
-        
-        var currentRouteIndex: [RouteKey: Int] = [:]
-        
-        // 2. Generate geometry
-        for event in journeyEvents {
-            guard let start = event.geoCoordinates, let end = event.destinationGeoCoordinates else { continue }
-            let startCoord = CLLocationCoordinate2D(latitude: start.lat, longitude: start.lng)
-            let endCoord = CLLocationCoordinate2D(latitude: end.lat, longitude: end.lng)
-             // Don't route if start/end are same
-            if abs(start.lat - end.lat) < 0.001 && abs(start.lng - end.lng) < 0.001 { continue }
-
-            let key = RouteKey(c1: startCoord, c2: endCoord)
-            let totalCount = routeCounts[key] ?? 1
-            let currentIndex = currentRouteIndex[key, default: 0]
-            currentRouteIndex[key] = currentIndex + 1
-            
-            let color = eventTypeColor(event.type)
-            
-            if totalCount == 1 {
-                // Simple straight line for single routes
-                polylines.append(RoutedPolyline(coordinates: [startCoord, endCoord], color: color))
-            } else {
-                // Generate curved line for overlapping routes
-                // Calculate curve intensity based on index (e.g., -1, 0, 1 for 3 routes)
-                // Centering the indices around 0
-                let centeredIndex = Double(currentIndex) - (Double(totalCount - 1) / 2.0)
-                // Max offset factor determines how wide the curve gets
-                let offsetFactor = centeredIndex * 0.2 // Adjust 0.2 to make curves wider/narrower
-                
-                let curvedCoords = getQuadraticBezier(from: startCoord, to: endCoord, offsetFactor: offsetFactor)
-                polylines.append(RoutedPolyline(coordinates: curvedCoords, color: color))
+struct ConnectionIndicatorView: View {
+    let durationStr: String
+    let message: String
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack {
+                Rectangle().fill(Color.gray.opacity(0.3)).frame(width: 2)
             }
+            .frame(width: 20)
+            
+            HStack {
+                Spacer()
+                HStack(spacing: 6) {
+                    Image(systemName: "clock").font(.caption2)
+                    Text(durationStr).fontWeight(.semibold)
+                    Text(message).foregroundStyle(.secondary)
+                }
+                .font(.caption)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Capsule().fill(Color.gray.opacity(0.2)))
+                Spacer()
+            }
+            Spacer().frame(width: 20).opacity(0)
         }
-        
-        return polylines
+        .frame(height: 40)
+        .padding(.horizontal, 20)
     }
-    
-    // Math to generate points along a curve between two coordinates on a globe approximation
-    private static func getQuadraticBezier(from start: CLLocationCoordinate2D, to end: CLLocationCoordinate2D, offsetFactor: Double) -> [CLLocationCoordinate2D] {
-        // Midpoint calculation
-        let midLat = (start.latitude + end.latitude) / 2.0
-        let midLng = (start.longitude + end.longitude) / 2.0
-        
-        // Calculate a vector perpendicular to the path (simplified planar approximation suitable for UI)
-        let dLat = end.latitude - start.latitude
-        let dLng = end.longitude - start.longitude
-        // Perpendicular vector (-y, x)
-        let perpLat = -dLng
-        let perpLng = dLat
-        
-        // Normalize and scale perpendicular vector
-        let magnitude = sqrt(perpLat*perpLat + perpLng*perpLng)
-        guard magnitude > 0 else { return [start, end] }
-        
-        // The control point determines the peak of the curve relative to the distance
-        let controlPointLat = midLat + (perpLat / magnitude) * magnitude * offsetFactor
-        let controlPointLng = midLng + (perpLng / magnitude) * magnitude * offsetFactor
+}
 
-        var points: [CLLocationCoordinate2D] = []
-        let segments = 20 // Number of points to smooth the curve
-        
-        for i in 0...segments {
-            let t = Double(i) / Double(segments)
-            let 𝐨𝐧𝐞𝐌𝐢𝐧𝐮𝐬𝐓 = 1.0 - t
-            
-            // Quadratic Bezier formula: B(t) = (1-t)²P₀ + 2(1-t)tP₁ + t²P₂
-            let lat = (𝐨𝐧𝐞𝐌𝐢𝐧𝐮𝐬𝐓 * 𝐨𝐧𝐞𝐌𝐢𝐧𝐮𝐬𝐓 * start.latitude) +
-                      (2 * 𝐨𝐧𝐞𝐌𝐢𝐧𝐮𝐬𝐓 * t * controlPointLat) +
-                      (t * t * end.latitude)
-            
-            let lng = (𝐨𝐧𝐞𝐌𝐢𝐧𝐮𝐬𝐓 * 𝐨𝐧𝐞𝐌𝐢𝐧𝐮𝐬𝐓 * start.longitude) +
-                      (2 * 𝐨𝐧𝐞𝐌𝐢𝐧𝐮𝐬𝐓 * t * controlPointLng) +
-                      (t * t * end.longitude)
-            
-            points.append(CLLocationCoordinate2D(latitude: lat, longitude: lng))
+struct BreakfastHeaderView: View {
+    let hotelName: String
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack { Circle().fill(Color.orange).frame(width: 8, height: 8) }.frame(width: 20)
+            HStack(spacing: 6) {
+                Image(systemName: "cup.and.saucer.fill").foregroundColor(.orange)
+                Text(hotelName).font(.subheadline).fontWeight(.medium).foregroundColor(.secondary)
+            }
+            Spacer()
         }
-        return points
+        .padding(.horizontal, 20)
+        .padding(.bottom, 12)
     }
-    
-    private static func eventTypeColor(_ type: EventType) -> Color {
-         switch type {
-         case .flight: return .blue
-         case .train: return .orange
-         case .car: return .green
-         case .transport: return .mint
-         default: return .gray
-         }
-     }
+}
+
+struct StayingFooterView: View {
+    let hotelName: String
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack { Circle().fill(Color.purple).frame(width: 8, height: 8) }.frame(width: 20)
+            HStack(spacing: 6) {
+                Image(systemName: "bed.double.fill").foregroundColor(.purple)
+                Text(hotelName).font(.subheadline).fontWeight(.medium).foregroundColor(.secondary)
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 4)
+    }
+}
+
+struct CheckoutHintView: View {
+    let hotelName: String
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack { Circle().stroke(Color.gray, lineWidth: 2).frame(width: 8, height: 8) }.frame(width: 20)
+            HStack(spacing: 6) {
+                Image(systemName: "figure.walk.departure").foregroundColor(.secondary)
+                Text(hotelName).font(.subheadline).fontWeight(.medium).foregroundColor(.secondary)
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 20)
+    }
+}
+
+struct ImagePicker: UIViewControllerRepresentable {
+    @Environment(\.presentationMode) var presentationMode
+    var onPick: (UIImage?) -> Void
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.delegate = context.coordinator
+        picker.sourceType = .photoLibrary
+        return picker
+    }
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+    class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
+        let parent: ImagePicker
+        init(_ parent: ImagePicker) { self.parent = parent }
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+            if let image = info[.originalImage] as? UIImage { parent.onPick(image) }
+            parent.presentationMode.wrappedValue.dismiss()
+        }
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) { parent.presentationMode.wrappedValue.dismiss() }
+    }
 }
