@@ -2,7 +2,7 @@
 //  EventCardView.swift
 //  TripMind
 //
-//  Created by EXC19 on 2026/1/16.
+//  Created by EXC19 on 2026/1/18.
 //
 
 import SwiftUI
@@ -12,184 +12,270 @@ struct EventCardView: View {
     
     private let timeFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.dateStyle = .short
-        formatter.timeStyle = .short
+        formatter.dateFormat = "HH:mm"
+        return formatter
+    }()
+    
+    private let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEE, MMM d"
         return formatter
     }()
     
     var body: some View {
-        HStack(alignment: .top, spacing: 15) {
-            // Timeline indicator
-            VStack {
-                Circle()
-                    .fill(colorForEventType(event.type))
-                    .frame(width: 15, height: 15)
-                Rectangle()
-                    .fill(Color.gray.opacity(0.5))
-                    .frame(width: 2, height: 60) // Adjust height as needed
-            }
+        HStack(alignment: .top, spacing: 12) {
             
-            // Event Card Content
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Image(systemName: event.type.symbolName)
-                        .font(.headline)
-                        .foregroundColor(colorForEventType(event.type))
-                    Text(event.displayTitle)
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                }
+            // Timeline Column
+            VStack(spacing: 0) {
+                Circle()
+                    .fill(eventTypeColor)
+                    .frame(width: 12, height: 12)
+                    .background(Circle().stroke(Color(UIColor.systemGroupedBackground), lineWidth: 4))
+                    .padding(.top, 4)
                 
-                Text(event.displayLocation)
-                    .font(.subheadline)
+                Rectangle()
+                    .fill(Color.timelineLine)
+                    .frame(width: 2)
+                    .frame(maxHeight: .infinity)
+            }
+            .frame(width: 20)
+            
+            // Content Column
+            VStack(alignment: .leading, spacing: 8) {
+                
+                // Date Header
+                Text(dateFormatter.string(from: event.startTime).uppercased())
+                    .font(.system(size: 14, weight: .bold))
                     .foregroundColor(.secondary)
                 
-                HStack {
-                    Text(timeFormatter.string(from: event.startTime))
-                    if let endTime = event.endTime {
-                        Text(" - \(timeFormatter.string(from: endTime))")
+                // Card Box
+                VStack(alignment: .leading, spacing: 12) {
+                    
+                    // Header: Logo + Title + Time
+                    HStack(alignment: .center, spacing: 12) {
+                        BrandLogoView(
+                            brandDomain: getBrandDomain(),
+                            fallbackIcon: event.type.symbolName
+                        )
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack {
+                                Text(displayTitle)
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .lineLimit(1)
+                                Spacer()
+                                // Time inside card
+                                Text(timeFormatter.string(from: event.startTime))
+                                    .font(.system(size: 16, weight: .bold))
+                                    .foregroundColor(.primary)
+                            }
+                            
+                            // Subtitle: Hide for Car (since it's in body), Show for others
+                            if !isCarEvent {
+                                Text(event.displayLocation)
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.secondary)
+                                    .lineLimit(1)
+                            }
+                        }
                     }
+                    
+                    Divider().opacity(0.5)
+                    
+                    // Specific Content
+                    contentView.padding(.top, 4)
                 }
-                .font(.caption)
-                .foregroundColor(.gray)
+                .padding(16)
+                .background(Color.cardBackground)
+                .cornerRadius(12)
+                .shadow(color: Color.black.opacity(0.05), radius: 3, x: 0, y: 1)
                 
-                // Add more specific details based on event.data type
-                detailsSection(for: event.data)
+                Spacer().frame(height: 12)
             }
-            .padding()
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(colorForEventType(event.type).opacity(0.1))
-            .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(colorForEventType(event.type), lineWidth: 1)
-            )
         }
-        .padding(.horizontal)
     }
     
     @ViewBuilder
-    private func detailsSection(for dataType: ItineraryEventDataType) -> some View {
-        switch dataType {
+    var contentView: some View {
+        switch event.data {
         case .flight(let flight):
-            VStack(alignment: .leading) {
-                Text("Flight No: \(flight.flightNumber)")
-                Text("From: \(flight.departureAirport) (\(flight.departureTerminal ?? ""))")
-                Text("To: \(flight.arrivalAirport) (\(flight.arrivalTerminal ?? ""))")
-            }
-            .font(.caption)
-            .foregroundColor(.secondary)
+            FlightCardContent(flight: flight, timeFormatter: timeFormatter)
         case .hotel(let hotel):
-            VStack(alignment: .leading) {
-                Text("Nights: \(hotel.numberOfNights)")
-                if let checkIn = hotel.checkInTime, let checkOut = hotel.checkOutTime {
-                    Text("Check-in: \(timeFormatter.string(from: checkIn))")
-                    Text("Check-out: \(timeFormatter.string(from: checkOut))")
-                }
-            }
-            .font(.caption)
-            .foregroundColor(.secondary)
-        case .train(let train):
-            VStack(alignment: .leading) {
-                Text("Train No: \(train.trainNumber ?? "N/A")")
-                Text("From: \(train.departureStation)")
-                Text("To: \(train.arrivalStation)")
-            }
-            .font(.caption)
-            .foregroundColor(.secondary)
+            HotelCardContent(hotel: hotel, timeFormatter: timeFormatter)
         case .car(let car):
-            VStack(alignment: .leading) {
-                Text("Pickup: \(car.origin)")
-                Text("Dropoff: \(car.destination)")
-                Text("Car: \(car.carBrand ?? "N/A") (\(car.carPlate ?? "N/A"))")
-            }
-            .font(.caption)
-            .foregroundColor(.secondary)
-        case .other(let other):
-            if let description = other.description {
-                Text(description)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            // You could add more display for extraFields if needed
+            CarCardContent(car: car)
+        case .train(let train):
+            TrainCardContent(train: train, timeFormatter: timeFormatter)
+        default:
+            EmptyView()
         }
     }
     
-    private func colorForEventType(_ type: EventType) -> Color {
-        switch type {
+    var displayTitle: String {
+        switch event.data {
+        case .flight(let f): return f.airlineCode != nil ? "\(f.airlineCode!)\(f.flightNumber)" : f.flightNumber
+        case .car(let c): return c.carBrand ?? "Ride"
+        default: return event.displayTitle
+        }
+    }
+    
+    var isCarEvent: Bool {
+        if case .car = event.data { return true }
+        return false
+    }
+    
+    var eventTypeColor: Color {
+        switch event.type {
         case .flight: return .blue
-        case .hotel: return .green
+        case .hotel: return .purple
         case .train: return .orange
-        case .car: return .purple
-        case .dining: return .red
-        case .activity: return .yellow
-        case .transport: return .teal
-        case .other: return .gray
+        case .car: return .green
+        default: return .gray
+        }
+    }
+    
+    func getBrandDomain() -> String? {
+        switch event.data {
+        case .flight(let f): return f.brandDomain
+        case .hotel(let h): return h.brandDomain
+        default: return nil
         }
     }
 }
 
-#Preview {
-    // Sample Flight Event
-    let flightEvent = TravelEvent(
-        id: UUID().uuidString,
-        type: .flight,
-        startTime: Date().addingTimeInterval(3600*2),
-        endTime: Date().addingTimeInterval(3600*5),
-        data: .flight(FlightData(
-            airline: "AirSwift",
-            brandDomain: nil,
-            airlineCode: nil,
-            flightNumber: "AS123",
-            confirmationCode: "ABCDEF",
-            passenger: nil,
-            travelClass: nil,
-            departureAirport: "JFK",
-            departureCountry: nil,
-            departureCountryCode: nil,
-            departureTerminal: "4",
-            departureGate: nil,
-            checkInDesk: nil,
-            seat: nil,
-            aircraft: nil,
-            aircraftRegistration: nil,
-            departureTime: Date().addingTimeInterval(3600*2),
-            arrivalAirport: "LAX",
-            arrivalCountry: nil,
-            arrivalCountryCode: nil,
-            arrivalTerminal: nil,
-            arrivalTime: Date().addingTimeInterval(3600*5),
-            etkt: nil,
-            fare: nil
-        ))
-    )
-    
-    // Sample Hotel Event
-    let hotelEvent = TravelEvent(
-        id: UUID().uuidString,
-        type: .hotel,
-        startTime: Date().addingTimeInterval(3600*6),
-        endTime: Date().addingTimeInterval(3600*6 + 86400*2),
-        data: .hotel(HotelData(
-            hotelName: "Grand Hyatt",
-            brandDomain: nil,
-            address: "123 Main St, Anytown",
-            checkInTime: Date().addingTimeInterval(3600*6),
-            checkOutTime: Date().addingTimeInterval(3600*6 + 86400*2),
-            bookingNumber: nil,
-            confirmationNumber: nil,
-            guestName: nil,
-            roomType: nil,
-            numberOfNights: "2 nights",
-            fare: nil,
-            isBreakfastIncluded: nil,
-            extraIncluded: nil
-        ))
-    )
+// MARK: - Subviews
 
-    // Fix: Remove explicit `return` in ViewBuilder
-    VStack(spacing: 20) {
-        EventCardView(event: flightEvent)
-        EventCardView(event: hotelEvent)
+struct FlightCardContent: View {
+    let flight: FlightData
+    let timeFormatter: DateFormatter
+    var body: some View {
+        HStack(alignment: .center) {
+            VStack(alignment: .leading) {
+                HStack(spacing: 4) {
+                    Text(flight.departureAirport).font(.system(size: 20, weight: .bold))
+                    if let term = flight.departureTerminal {
+                        // ✅ FIX: Check prefix before adding T
+                        Text(formatTerminal(term)).font(.system(size: 20, weight: .bold)).foregroundColor(.secondary)
+                    }
+                }
+                Text(timeFormatter.string(from: flight.departureTime)).font(.subheadline).foregroundColor(.secondary)
+            }
+            Spacer()
+            Image(systemName: "airplane").foregroundColor(.gray.opacity(0.5))
+            Spacer()
+            VStack(alignment: .trailing) {
+                HStack(spacing: 4) {
+                    Text(flight.arrivalAirport).font(.system(size: 20, weight: .bold))
+                    if let term = flight.arrivalTerminal {
+                        // ✅ FIX: Check prefix before adding T
+                        Text(formatTerminal(term)).font(.system(size: 20, weight: .bold)).foregroundColor(.secondary)
+                    }
+                }
+                Text(timeFormatter.string(from: flight.arrivalTime)).font(.subheadline).foregroundColor(.secondary)
+            }
+        }
+    }
+    
+    // Helper to format terminal string
+    func formatTerminal(_ term: String) -> String {
+        if term.uppercased().hasPrefix("T") || term.lowercased().contains("terminal") {
+            return term
+        }
+        return "T\(term)"
+    }
+}
+
+// ✅ UPDATED CAR CARD CONTENT (Vertical Layout)
+struct CarCardContent: View {
+    let car: CarData
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Origin (Line 1)
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: "circle.fill")
+                    .font(.system(size: 8))
+                    .foregroundColor(.green)
+                    .padding(.top, 4)
+                Text(car.origin)
+                    .font(.subheadline)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            
+            // Destination (Line 2)
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: "circle.fill")
+                    .font(.system(size: 8))
+                    .foregroundColor(.red)
+                    .padding(.top, 4)
+                Text(car.destination ?? "Unknown Destination")
+                    .font(.subheadline)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            
+            Divider()
+            
+            // Footer (Plate)
+            HStack {
+                Text(car.carPlate ?? "No Plate")
+                    .font(.caption).bold()
+                    .padding(4)
+                    .background(Color.gray.opacity(0.1))
+                    .cornerRadius(4)
+                
+                Spacer()
+                if let driver = car.driver {
+                    Text(driver).font(.caption).foregroundColor(.secondary)
+                }
+            }
+        }
+    }
+}
+
+struct HotelCardContent: View {
+    let hotel: HotelData
+    let timeFormatter: DateFormatter
+    var body: some View {
+        HStack(spacing: 16) {
+            if let checkIn = hotel.checkInTime {
+                VStack(alignment: .leading) {
+                    Text("Check-in").font(.caption2).foregroundColor(.secondary)
+                    Text(timeFormatter.string(from: checkIn)).font(.subheadline).bold()
+                }
+            }
+            if let checkOut = hotel.checkOutTime {
+                VStack(alignment: .leading) {
+                    Text("Check-out").font(.caption2).foregroundColor(.secondary)
+                    Text(timeFormatter.string(from: checkOut)).font(.subheadline).bold()
+                }
+            }
+            Spacer()
+            if !hotel.numberOfNights.isEmpty {
+                Text(hotel.numberOfNights)
+                    .font(.caption).bold()
+                    .padding(6)
+                    .background(Color.blue.opacity(0.1))
+                    .cornerRadius(6)
+            }
+        }
+    }
+}
+
+struct TrainCardContent: View {
+    let train: TrainData
+    let timeFormatter: DateFormatter
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading) {
+                Text(train.departureStation).font(.headline)
+                Text(timeFormatter.string(from: train.departureTime)).font(.subheadline).foregroundColor(.secondary)
+            }
+            Spacer()
+            Image(systemName: "arrow.right").font(.caption).foregroundColor(.secondary)
+            Spacer()
+            VStack(alignment: .trailing) {
+                Text(train.arrivalStation).font(.headline)
+                Text(timeFormatter.string(from: train.arrivalTime)).font(.subheadline).foregroundColor(.secondary)
+            }
+        }
     }
 }

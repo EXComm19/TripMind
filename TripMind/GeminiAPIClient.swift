@@ -90,17 +90,19 @@ class GeminiAPIClient {
             let confirmationCode: String
             let passenger: String?
             let travelClass: String?
-            let departureAirport: String
+            let departureAirport: String // IATA e.g. "KIX"
             let departureCountry: String?
             let departureCountryCode: String?
             let departureTerminal: String?
+            let departureCity: String? // e.g. "Osaka"
+            let arrivalCity: String?   // e.g. "Guangzhou"
             let departureGate: String?
             let checkInDesk: String?
             let seat: String?
             let aircraft: String?
             let aircraftRegistration: String?
             let departureTime: Date // ISO 8601 format string
-            let arrivalAirport: String
+            let arrivalAirport: String // IATA e.g. "CAN"
             let arrivalCountry: String?
             let arrivalCountryCode: String?
             let arrivalTerminal: String?
@@ -131,7 +133,7 @@ class GeminiAPIClient {
             let origin: String
             let departureCountry: String?
             let departureCountryCode: String?
-            let destination: String
+            let destination: String?
             let arrivalCountry: String?
             let arrivalCountryCode: String?
             let pickupTime: Date // ISO
@@ -340,11 +342,11 @@ class GeminiAPIClient {
             return try extractEventsFromResponse(response: response)
         } catch let error { // Capture generic error here
             print("DEBUG: Error in parsePDF: \(error)")
-            if let nsError = error as? NSError {
+            let nsError = error as NSError
                 print("DEBUG: NSError domain: \(nsError.domain), code: \(nsError.code), userInfo: \(nsError.userInfo)")
                 if nsError.domain == "com.firebase.generativeai" {
                     throw GeminiAPIError.firebaseError(nsError)
-                }
+                
             }
             throw GeminiAPIError.networkError(error)
         }
