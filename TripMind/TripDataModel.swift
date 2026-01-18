@@ -79,7 +79,7 @@ struct WeatherInfo: Codable, Hashable {
     var precipitationProbability: Double?
 }
 
-// ✅ NEW: Baggage Data Models
+// MARK: - Baggage Data Models
 enum BaggageType: String, Codable, CaseIterable, Identifiable {
     case carryOn = "Carry-on"
     case checked = "Checked"
@@ -100,6 +100,7 @@ struct BaggageItem: Codable, Hashable, Identifiable {
 
 // MARK: - Specific Data Schemas
 
+// ✅ Changed all 'let' to 'var' to allow editing
 struct FlightData: Codable, Hashable {
     var airline: String
     var brandDomain: String?
@@ -117,7 +118,7 @@ struct FlightData: Codable, Hashable {
     var departureCountryCode: String?
     var departureTerminal: String?
     var departureGate: String?
-    var checkInDesk: String?
+    var checkInCounter: String? // Renamed from checkInDesk
     var seat: String?
     var aircraft: String?
     var aircraftRegistration: String?
@@ -130,7 +131,6 @@ struct FlightData: Codable, Hashable {
     var etkt: String?
     var fare: TravelFare?
     
-    // ✅ NEW: Baggage List
     var baggage: [BaggageItem]?
 }
 

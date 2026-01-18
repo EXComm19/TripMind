@@ -36,86 +36,98 @@ struct TripDetailView: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            ScrollView {
-                LazyVStack(spacing: 0, pinnedViews: []) {
-                    
-                    if isParsing {
-                        VStack(spacing: 12) {
-                            ProgressView().scaleEffect(1.2)
-                            Text("Analyzing itinerary...").font(.subheadline).foregroundColor(.secondary)
-                        }
-                        .padding(30)
+            
+            // LIST CONTENT
+            List {
+                if isParsing {
+                    VStack(spacing: 12) {
+                        ProgressView().scaleEffect(1.2)
+                        Text("Analyzing itinerary...").font(.subheadline).foregroundColor(.secondary)
                     }
-                    
-                    if let error = parsingError {
-                        HStack {
-                            Image(systemName: "exclamationmark.triangle.fill").foregroundColor(.red)
-                            Text(error).font(.caption).foregroundColor(.red)
-                            Spacer()
-                            Button { parsingError = nil } label: { Image(systemName: "xmark") }
-                        }
-                        .padding()
-                        .background(Color.red.opacity(0.1))
-                        .cornerRadius(12)
-                        .padding()
+                    .frame(maxWidth: .infinity)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                } else if let error = parsingError {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle.fill").foregroundColor(.red)
+                        Text(error).font(.caption).foregroundColor(.red)
+                        Spacer()
+                        Button { parsingError = nil } label: { Image(systemName: "xmark") }
                     }
-                    
-                    if trip.events.isEmpty && !isParsing {
-                        VStack(spacing: 16) {
-                            Image(systemName: "airplane.departure")
-                                .font(.system(size: 48))
-                                .foregroundColor(.gray.opacity(0.5))
-                            Text("No events yet")
-                                .font(.title3).fontWeight(.semibold)
-                            Text("Tap the + button to import your itinerary.")
-                                .font(.subheadline).foregroundColor(.secondary)
-                        }
-                        .padding(.top, 60)
-                    } else {
-                        // MARK: - Timeline Render
-                        ForEach(timelineDays) { daySchedule in
-                            VStack(alignment: .leading, spacing: 0) {
-                                
-                                // Day Header
-                                Text(daySchedule.date.formatted(.dateTime.weekday().month().day()))
-                                    .font(.subheadline)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.secondary)
-                                    .textCase(.uppercase)
-                                    .padding(.horizontal, 20)
-                                    .padding(.top, 24)
-                                    .padding(.bottom, 12)
-                                
-                                // Items
-                                ForEach(daySchedule.items) { item in
-                                    switch item.content {
-                                    case .breakfast(let hotelName):
-                                        BreakfastHeaderView(hotelName: hotelName)
-                                        
-                                    case .checkoutHint(let hotelName):
-                                        CheckoutHintView(hotelName: hotelName)
-                                            .padding(.bottom, 12)
-                                        
-                                    case .event(let event):
-                                        EventCardView(event: event)
-                                            .padding(.horizontal, 20)
-                                            .contentShape(Rectangle())
-                                            .onTapGesture { eventToEdit = event }
-                                        
-                                    case .connection(let duration, let msg):
-                                        ConnectionIndicatorView(durationStr: duration, message: msg)
-                                        
-                                    case .staying(let hotelName):
-                                        StayingFooterView(hotelName: hotelName)
-                                            .padding(.bottom, 12)
+                    .padding()
+                    .background(Color.red.opacity(0.1))
+                    .cornerRadius(12)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                } else if trip.events.isEmpty {
+                    VStack(spacing: 16) {
+                        Image(systemName: "airplane.departure")
+                            .font(.system(size: 48))
+                            .foregroundColor(.gray.opacity(0.5))
+                        Text("No events yet")
+                            .font(.title3).fontWeight(.semibold)
+                        Text("Tap the + button to import your itinerary.")
+                            .font(.subheadline).foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 60)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                }
+                
+                ForEach(timelineDays) { daySchedule in
+                    Section(header:
+                        Text(daySchedule.date.formatted(.dateTime.weekday().month().day()))
+                            .font(.subheadline)
+                            .fontWeight(.bold)
+                            .foregroundColor(.secondary)
+                            .textCase(.uppercase)
+                            .padding(.vertical, 8)
+                    ) {
+                        ForEach(daySchedule.items) { item in
+                            ZStack {
+                                switch item.content {
+                                case .breakfast(let hotelName):
+                                    BreakfastHeaderView(hotelName: hotelName)
+                                case .checkoutHint(let hotelName):
+                                    CheckoutHintView(hotelName: hotelName)
+                                case .event(let event):
+                                    EventCardView(event: event)
+                                        .contentShape(Rectangle())
+                                        .onTapGesture { eventToEdit = event }
+                                case .connection(let duration, let msg):
+                                    ConnectionIndicatorView(durationStr: duration, message: msg)
+                                case .staying(let hotelName):
+                                    StayingFooterView(hotelName: hotelName)
+                                }
+                            }
+                            .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                if case .event(let event) = item.content {
+                                    Button(role: .destructive) {
+                                        deleteEvent(event)
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
                                     }
                                 }
                             }
                         }
                     }
                 }
-                .padding(.bottom, 100)
+                
+                // ✅ FIX: Spacer is INSIDE the List.
+                // This pushes content up so it's not hidden by floating buttons,
+                // but allows the List background to extend fully to the bottom edge.
+                Color.clear
+                    .frame(height: 80)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
             }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            // ❌ REMOVED: .padding(.bottom, 80) <- This was the culprit for the cut-off
             
             // Toast
             if showPasteSuccess {
@@ -128,7 +140,8 @@ struct TripDetailView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .background(Color(UIColor.systemGroupedBackground))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
         .navigationTitle(trip.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -152,7 +165,11 @@ struct TripDetailView: View {
             }
         }
         .sheet(item: $eventToEdit) { event in
-            EditEventSheet(event: event) { saveUpdatedEvent($0) }
+            EditEventSheet(event: event, onDelete: {
+                deleteEvent(event)
+            }, onSave: { updated in
+                saveUpdatedEvent(updated)
+            })
         }
         .sheet(isPresented: $showingDocumentPicker) { DocumentPicker(onPick: handlePickedDocuments) }
         .sheet(isPresented: $showingImagePicker) { ImagePicker(onPick: handlePickedImage) }
@@ -165,6 +182,15 @@ struct TripDetailView: View {
     }
     
     // MARK: - Handlers
+    private func deleteEvent(_ event: TravelEvent) {
+        if let index = trip.events.firstIndex(where: { $0.id == event.id }) {
+            var newTrip = trip
+            newTrip.events.remove(at: index)
+            self.trip = newTrip
+            Task { try? await tripStore.updateTrip(self.trip) }
+        }
+    }
+    
     private func saveUpdatedEvent(_ updatedEvent: TravelEvent) {
         if let index = trip.events.firstIndex(where: { $0.id == updatedEvent.id }) {
             var newTrip = trip
@@ -241,7 +267,6 @@ struct TripDetailView: View {
 }
 
 // MARK: - Timeline Logic
-
 struct TripTimelineProvider {
     enum TimelineItemContent {
         case event(TravelEvent)
@@ -267,32 +292,21 @@ struct TripTimelineProvider {
         let sortedEvents = events.sorted { $0.startTime < $1.startTime }
         var combinedItems: [TimelineItem] = []
         
-        // 1. Add ALL Events to the list
-        for event in sortedEvents {
+        let hotelEvents = sortedEvents.filter { $0.type == .hotel }
+        let transportEvents = sortedEvents.filter { isTransport($0.type) }
+        
+        for (index, event) in sortedEvents.enumerated() {
             combinedItems.append(TimelineItem(dateForSorting: event.startTime, content: .event(event)))
         }
         
-        // 2. Identify Hotel Stays (for header/footer logic)
-        let hotelEvents = sortedEvents.filter { $0.type == .hotel }
-        
-        // 3. Connection Logic (✅ FIXED: Filter ONLY Transport events)
-        // We do this separately so Hotels don't break the chain between Flight A and Flight B
-        let transportEvents = sortedEvents.filter { isTransport($0.type) }
-        
         for (index, event) in transportEvents.enumerated() {
-            // Check next TRANSPORT event
             if index < transportEvents.count - 1 {
                 let nextEvent = transportEvents[index + 1]
-                
                 if let endDate = event.endTime {
                     let layover = nextEvent.startTime.timeIntervalSince(endDate)
-                    
-                    // Connection must be positive and less than 24 hours
                     if layover > 0 && layover < (24 * 3600) {
                         var loc = "Layover"
                         if case .flight(let f) = event.data { loc = "at \(f.arrivalAirport)" }
-                        
-                        // Insert connection pill slightly after the first flight arrives
                         combinedItems.append(TimelineItem(
                             dateForSorting: endDate.addingTimeInterval(1),
                             content: .connection(durationStr: formatDuration(layover), airportMsg: loc)
@@ -302,21 +316,17 @@ struct TripTimelineProvider {
             }
         }
         
-        // 4. Group by Day
         let groupedDict = Dictionary(grouping: combinedItems) { Calendar.current.startOfDay(for: $0.dateForSorting) }
         let allDates = groupedDict.keys.sorted()
         
         return allDates.map { date -> DaySchedule in
             var items = groupedDict[date]!.sorted { $0.dateForSorting < $1.dateForSorting }
-            
-            // --- STRICT ORDERING LOGIC ---
             var breakfastItems: [TimelineItem] = []
             var checkoutItems: [TimelineItem] = []
             var eventItems: [TimelineItem] = []
             var hotelCheckInItems: [TimelineItem] = []
             var stayingItems: [TimelineItem] = []
             
-            // Distribute items into buckets
             for item in items {
                 if case .event(let e) = item.content, e.type == .hotel {
                     hotelCheckInItems.append(item)
@@ -325,7 +335,6 @@ struct TripTimelineProvider {
                 }
             }
             
-            // Morning Logic: Breakfast & Checkout
             if let activeMorningHotel = hotelEvents.first(where: {
                 if let checkIn = $0.startTime as Date?, let checkOut = $0.endTime {
                     let startDay = Calendar.current.startOfDay(for: checkIn)
@@ -344,7 +353,6 @@ struct TripTimelineProvider {
                 }
             }
             
-            // Night Logic: Staying
             if let activeNightHotel = hotelEvents.first(where: {
                 if let checkIn = $0.startTime as Date?, let checkOut = $0.endTime {
                     let startDay = Calendar.current.startOfDay(for: checkIn)
@@ -353,11 +361,15 @@ struct TripTimelineProvider {
                 }
                 return false
             }) {
-                stayingItems.append(TimelineItem(dateForSorting: date, content: .staying(hotelName: activeNightHotel.displayTitle)))
+                let isCheckInToday = hotelCheckInItems.contains { item in
+                    if case .event(let e) = item.content { return e.id == activeNightHotel.id }
+                    return false
+                }
+                if !isCheckInToday {
+                    stayingItems.append(TimelineItem(dateForSorting: date, content: .staying(hotelName: activeNightHotel.displayTitle)))
+                }
             }
             
-            // Combine in Strict Order
-            // Note: 'eventItems' now contains both TravelEvents (Flight/Train) AND Connection Pills, sorted by time.
             let finalItems = breakfastItems + checkoutItems + eventItems + hotelCheckInItems + stayingItems
             return DaySchedule(date: date, items: finalItems)
         }

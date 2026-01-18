@@ -11,52 +11,57 @@ struct EditEventSheet: View {
     @Environment(\.dismiss) var dismiss
     
     @State var event: TravelEvent
+    
+    // Delete handler (Kept in case you want to use it elsewhere, e.g. toolbar)
+    var onDelete: () -> Void
     var onSave: (TravelEvent) -> Void
     
     var body: some View {
         NavigationView {
-            Group {
-                switch event.data {
-                case .flight(let flightData):
-                    FlightEditForm(
-                        flightData: Binding(
-                            get: { flightData },
-                            set: { newData in event.data = .flight(newData) }
-                        ),
-                        bookingSource: $event.bookingSource
-                    )
-                case .hotel(let hotelData):
-                    HotelEditForm(
-                        hotelData: Binding(
-                            get: { hotelData },
-                            set: { newData in event.data = .hotel(newData) }
-                        ),
-                        bookingSource: $event.bookingSource
-                    )
-                case .train(let trainData):
-                    TrainEditForm(
-                        trainData: Binding(
-                            get: { trainData },
-                            set: { newData in event.data = .train(newData) }
-                        ),
-                        bookingSource: $event.bookingSource
-                    )
-                case .car(let carData):
-                    CarEditForm(
-                        carData: Binding(
-                            get: { carData },
-                            set: { newData in event.data = .car(newData) }
-                        ),
-                        bookingSource: $event.bookingSource
-                    )
-                case .other(let otherData):
-                    OtherEditForm(
-                        otherData: Binding(
-                            get: { otherData },
-                            set: { newData in event.data = .other(newData) }
-                        ),
-                        bookingSource: $event.bookingSource
-                    )
+            VStack(spacing: 0) {
+                Group {
+                    switch event.data {
+                    case .flight(let flightData):
+                        FlightEditForm(
+                            flightData: Binding(
+                                get: { flightData },
+                                set: { newData in event.data = .flight(newData) }
+                            ),
+                            bookingSource: $event.bookingSource
+                        )
+                    case .hotel(let hotelData):
+                        HotelEditForm(
+                            hotelData: Binding(
+                                get: { hotelData },
+                                set: { newData in event.data = .hotel(newData) }
+                            ),
+                            bookingSource: $event.bookingSource
+                        )
+                    case .train(let trainData):
+                        TrainEditForm(
+                            trainData: Binding(
+                                get: { trainData },
+                                set: { newData in event.data = .train(newData) }
+                            ),
+                            bookingSource: $event.bookingSource
+                        )
+                    case .car(let carData):
+                        CarEditForm(
+                            carData: Binding(
+                                get: { carData },
+                                set: { newData in event.data = .car(newData) }
+                            ),
+                            bookingSource: $event.bookingSource
+                        )
+                    case .other(let otherData):
+                        OtherEditForm(
+                            otherData: Binding(
+                                get: { otherData },
+                                set: { newData in event.data = .other(newData) }
+                            ),
+                            bookingSource: $event.bookingSource
+                        )
+                    }
                 }
             }
             .navigationTitle("Edit Event")
@@ -67,7 +72,7 @@ struct EditEventSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        syncTimes() // ✅ FIX: Update root times before saving
+                        syncTimes()
                         onSave(event)
                         dismiss()
                     }
@@ -76,7 +81,6 @@ struct EditEventSheet: View {
         }
     }
     
-    // ✅ Helper to keep root TravelEvent times in sync with edited Data
     private func syncTimes() {
         switch event.data {
         case .flight(let f):
@@ -87,8 +91,6 @@ struct EditEventSheet: View {
             event.endTime = t.arrivalTime
         case .car(let c):
             event.startTime = c.pickupTime
-            // Car might not have end time, preserve existing if not set?
-            // Usually car endTime is nil unless it's a rental duration.
         case .hotel(let h):
             if let start = h.checkInTime { event.startTime = start }
             if let end = h.checkOutTime { event.endTime = end }

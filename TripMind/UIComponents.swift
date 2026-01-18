@@ -7,12 +7,20 @@
 
 import SwiftUI
 
-// ✅ NEW: Logo.dev Configuration
+// Logo.dev Configuration
 let LOGO_DEV_PUBLIC_KEY = "pk_EcUNocp3RJOn4qZwg9KGTA"
 
 struct BrandLogoView: View {
     let brandDomain: String?
     let fallbackIcon: String
+    var size: CGFloat = 40
+    
+    // ✅ DYNAMIC RADIUS: Adjusted ratio for sharper corners.
+    // 16px icon -> 3.2px radius (Distinctly rounded square)
+    // 40px icon -> 8px radius
+    private var cornerRadius: CGFloat {
+        return size * 0.2
+    }
     
     var body: some View {
         if let domain = brandDomain, !domain.isEmpty,
@@ -24,19 +32,19 @@ struct BrandLogoView: View {
                     image.resizable()
                         .aspectRatio(contentMode: .fit)
                 case .failure:
-                    fallbackImage // Fallback if Logo.dev fails
+                    fallbackImage
                 case .empty:
-                    ProgressView() // Spinner while loading
-                        .frame(width: 24, height: 24)
+                    ProgressView()
+                        .frame(width: size * 0.6, height: size * 0.6)
                 @unknown default:
                     fallbackImage
                 }
             }
-            .frame(width: 40, height: 40)
+            .frame(width: size, height: size)
             .background(Color.white)
-            .clipShape(Circle())
-            // Add a subtle border so white logos don't disappear on white backgrounds
-            .overlay(Circle().stroke(Color.gray.opacity(0.2), lineWidth: 1))
+            // ✅ Clip shape applied here
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+            .overlay(RoundedRectangle(cornerRadius: cornerRadius).stroke(Color.gray.opacity(0.2), lineWidth: 1))
             
         } else {
             fallbackImage
@@ -47,12 +55,14 @@ struct BrandLogoView: View {
         Image(systemName: fallbackIcon)
             .resizable()
             .aspectRatio(contentMode: .fit)
-            .frame(width: 20, height: 20)
-            .padding(10)
+            .frame(width: size * 0.5, height: size * 0.5)
+            .padding(size * 0.25)
             .background(Color.gray.opacity(0.1))
             .foregroundColor(.gray)
-            .clipShape(Circle())
-            .overlay(Circle().stroke(Color.gray.opacity(0.2), lineWidth: 1))
+            // ✅ Clip shape applied here
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+            .overlay(RoundedRectangle(cornerRadius: cornerRadius).stroke(Color.gray.opacity(0.2), lineWidth: 1))
+            .frame(width: size, height: size)
     }
 }
 
@@ -60,4 +70,4 @@ struct BrandLogoView: View {
 extension Color {
     static let cardBackground = Color(UIColor.secondarySystemGroupedBackground)
     static let timelineLine = Color.gray.opacity(0.3)
-}   
+}
