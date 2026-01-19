@@ -117,9 +117,6 @@ struct TripDetailView: View {
                     }
                 }
                 
-                // ✅ FIX: Spacer is INSIDE the List.
-                // This pushes content up so it's not hidden by floating buttons,
-                // but allows the List background to extend fully to the bottom edge.
                 Color.clear
                     .frame(height: 80)
                     .listRowBackground(Color.clear)
@@ -127,7 +124,6 @@ struct TripDetailView: View {
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
-            // ❌ REMOVED: .padding(.bottom, 80) <- This was the culprit for the cut-off
             
             // Toast
             if showPasteSuccess {
@@ -385,82 +381,58 @@ struct TripTimelineProvider {
     }
 }
 
-// MARK: - Subviews
+// MARK: - Subviews (Simplified - No Timeline)
 
 struct ConnectionIndicatorView: View {
     let durationStr: String
     let message: String
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack {
-                Rectangle().fill(Color.gray.opacity(0.3)).frame(width: 2)
-            }
-            .frame(width: 20)
-            
-            HStack {
-                Spacer()
-                HStack(spacing: 6) {
-                    Image(systemName: "clock").font(.caption2)
-                    Text(durationStr).fontWeight(.semibold)
-                    Text(message).foregroundStyle(.secondary)
-                }
-                .font(.caption)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(Capsule().fill(Color.gray.opacity(0.2)))
-                Spacer()
-            }
-            Spacer().frame(width: 20).opacity(0)
+        HStack(alignment: .center, spacing: 6) {
+            Image(systemName: "clock").font(.caption2)
+            Text(durationStr).fontWeight(.semibold)
+            Text(message).foregroundStyle(.secondary)
         }
-        .frame(height: 40)
-        .padding(.horizontal, 20)
+        .font(.caption)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(Capsule().fill(Color.gray.opacity(0.2)))
+        .padding(.vertical, 8)
     }
 }
 
 struct BreakfastHeaderView: View {
     let hotelName: String
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack { Circle().fill(Color.orange).frame(width: 8, height: 8) }.frame(width: 20)
-            HStack(spacing: 6) {
-                Image(systemName: "cup.and.saucer.fill").foregroundColor(.orange)
-                Text(hotelName).font(.subheadline).fontWeight(.medium).foregroundColor(.secondary)
-            }
+        HStack(spacing: 6) {
+            Image(systemName: "cup.and.saucer.fill").foregroundColor(.orange)
+            Text(hotelName).font(.subheadline).fontWeight(.medium).foregroundColor(.secondary)
             Spacer()
         }
-        .padding(.horizontal, 20)
-        .padding(.bottom, 12)
+        .padding(.vertical, 4)
     }
 }
 
 struct StayingFooterView: View {
     let hotelName: String
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack { Circle().fill(Color.purple).frame(width: 8, height: 8) }.frame(width: 20)
-            HStack(spacing: 6) {
-                Image(systemName: "bed.double.fill").foregroundColor(.purple)
-                Text(hotelName).font(.subheadline).fontWeight(.medium).foregroundColor(.secondary)
-            }
+        HStack(spacing: 6) {
+            Image(systemName: "bed.double.fill").foregroundColor(.purple)
+            Text(hotelName).font(.subheadline).fontWeight(.medium).foregroundColor(.secondary)
             Spacer()
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 4)
+        .padding(.vertical, 4)
     }
 }
 
 struct CheckoutHintView: View {
     let hotelName: String
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack { Circle().stroke(Color.gray, lineWidth: 2).frame(width: 8, height: 8) }.frame(width: 20)
-            HStack(spacing: 6) {
-                Image(systemName: "figure.walk.departure").foregroundColor(.secondary)
-                Text(hotelName).font(.subheadline).fontWeight(.medium).foregroundColor(.secondary)
-            }
+        HStack(spacing: 6) {
+            Image(systemName: "figure.walk.departure").foregroundColor(.secondary)
+            Text(hotelName).font(.subheadline).fontWeight(.medium).foregroundColor(.secondary)
             Spacer()
         }
-        .padding(.horizontal, 20)
+        .padding(.vertical, 4)
     }
 }
 

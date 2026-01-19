@@ -100,7 +100,6 @@ struct BaggageItem: Codable, Hashable, Identifiable {
 
 // MARK: - Specific Data Schemas
 
-// ✅ Changed all 'let' to 'var' to allow editing
 struct FlightData: Codable, Hashable {
     var airline: String
     var brandDomain: String?
@@ -118,7 +117,7 @@ struct FlightData: Codable, Hashable {
     var departureCountryCode: String?
     var departureTerminal: String?
     var departureGate: String?
-    var checkInCounter: String? // Renamed from checkInDesk
+    var checkInCounter: String?
     var seat: String?
     var aircraft: String?
     var aircraftRegistration: String?
@@ -165,6 +164,7 @@ struct CarData: Codable, Hashable {
     var carPlate: String?
     var carColor: String?
     var carBrand: String?
+    var serviceType: String? // ✅ Added: e.g. "Airport Pickup", "Ride Share"
     var fare: TravelFare?
 }
 
