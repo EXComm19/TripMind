@@ -28,23 +28,23 @@ enum GeminiAPIError: Error, LocalizedError {
         case .decodingError(let error): return "Failed to decode Gemini's response: \(error.localizedDescription)"
         case .invalidInput: return "Invalid input provided to Gemini API."
         case .firebaseError(let error): return "Firebase AI Logic Error: \(error.localizedDescription)"
-        case .debuggingModeActive: return "Decoding paused for debugging. Check console for raw Gemini response." // ADDED
+        case .debuggingModeActive: return "Decoding paused for debugging. Check console for raw Gemini response."
         }
     }
 }
 
 class GeminiAPIClient {
     private let textModel: GenerativeModel
-    private let visionModel: GenerativeModel // Use gemini-pro-vision for image/PDF inputs
+    private let visionModel: GenerativeModel
     
-    private let firebaseAI: FirebaseAI // Keep the FirebaseAI instance
+    private let firebaseAI: FirebaseAI
 
     init() {
         self.firebaseAI = FirebaseAI.firebaseAI(backend: .googleAI())
         
-        // Ensure consistent model names if both are intended to be multi-modal capable "flash" models
-        self.textModel = firebaseAI.generativeModel(modelName: "gemini-2.5-flash") // Reverted to 1.5-flash for broader access
-        self.visionModel = firebaseAI.generativeModel(modelName: "gemini-2.5-flash") // Using same model for multimodal
+        // Using "flash" model for speed and efficiency
+        self.textModel = firebaseAI.generativeModel(modelName: "gemini-2.5-flash")
+        self.visionModel = firebaseAI.generativeModel(modelName: "gemini-2.5-flash")
     }
     
     private func generatePrompt(for content: String) -> String {
@@ -92,49 +92,45 @@ class GeminiAPIClient {
                 let confirmationCode: String
                 let passenger: String?
                 let travelClass: String?
-                let departureAirport: String // IATA e.g. "KIX"
+                let departureAirport: String
                 let departureCountry: String?
                 let departureCountryCode: String?
                 let departureTerminal: String?
-                let departureCity: String? // e.g. "Osaka"
-                let arrivalCity: String?   // e.g. "Guangzhou"
+                let departureCity: String?
+                let arrivalCity: String?
                 let departureGate: String?
-                let checkInDesk: String? // Mapped from checkInCounter
+                let checkInCounter: String?
                 let seat: String?
                 let aircraft: String?
                 let aircraftRegistration: String?
-                let departureTime: Date // ISO 8601 format string
-                let arrivalAirport: String // IATA e.g. "CAN"
+                let departureTime: Date // ISO with Offset
+                let arrivalAirport: String
                 let arrivalCountry: String?
                 let arrivalCountryCode: String?
                 let arrivalTerminal: String?
-                let arrivalTime: Date // ISO 8601 format string
+                let arrivalTime: Date // ISO with Offset
                 let etkt: String?
                 let fare: TravelFare?
-                
-                // Moved here:
                 let bookingSource: BookingSource?
             }
 
             struct TrainData: Codable, Hashable {
-                let trainOperator: String? // Mapped from serviceProvider
-                let brandDomain: String?
+                let serviceProvider: String? // Operator Name
+                let brandDomain: String?     // Operator Domain
                 let trainNumber: String?
                 let passenger: String?
                 let travelClass: String?
                 let departureStation: String
                 let departureCountry: String?
                 let departureCountryCode: String?
-                let departureTime: Date // ISO
+                let departureTime: Date // ISO with Offset
                 let departureGate: String?
                 let seat: String?
                 let arrivalStation: String
                 let arrivalCountry: String?
                 let arrivalCountryCode: String?
-                let arrivalTime: Date // ISO
+                let arrivalTime: Date // ISO with Offset
                 let fare: TravelFare?
-                
-                // Moved here:
                 let bookingSource: BookingSource?
             }
 
@@ -147,7 +143,7 @@ class GeminiAPIClient {
                 let destination: String?
                 let arrivalCountry: String?
                 let arrivalCountryCode: String?
-                let pickupTime: Date // ISO
+                let pickupTime: Date // ISO with Offset
                 let driver: String?
                 let passenger: String?
                 let carPlate: String?
@@ -155,8 +151,6 @@ class GeminiAPIClient {
                 let carBrand: String?
                 let serviceType: String?
                 let fare: TravelFare?
-                
-                // Moved here:
                 let bookingSource: BookingSource?
             }
 
@@ -164,18 +158,16 @@ class GeminiAPIClient {
                 let hotelName: String
                 let brandDomain: String?
                 let address: String
-                let checkInTime: Date? // ISO
-                let checkOutTime: Date? // ISO
+                let checkInTime: Date? // ISO with Offset
+                let checkOutTime: Date? // ISO with Offset
                 let bookingNumber: String?
                 let confirmationNumber: String?
                 let guestName: String?
                 let roomType: String?
-                let numberOfNights: String // Store as string
+                let numberOfNights: String
                 let fare: TravelFare?
                 let isBreakfastIncluded: Bool?
                 let extraIncluded: String?
-                
-                // Moved here:
                 let bookingSource: BookingSource?
             }
 
@@ -185,8 +177,6 @@ class GeminiAPIClient {
                 let location: String?
                 let time: String? 
                 let fare: TravelFare?
-                
-                // Moved here:
                 let bookingSource: BookingSource?
             }
 
@@ -199,30 +189,27 @@ class GeminiAPIClient {
             }
 
             struct TravelEvent: Codable, Identifiable, Hashable {
-                let id: String // UUID().uuidString
+                let id: String
                 let type: EventType
-                let startTime: Date // ISO
-                let endTime: Date? // ISO
+                let startTime: Date
+                let endTime: Date?
                 let geoCoordinates: GeoCoordinates?
                 let destinationGeoCoordinates: GeoCoordinates? 
                 let detectedLanguage: String?
-                
-                // NOTE: bookingSource is NO LONGER here. It is inside the 'data' struct.
-                
+                // bookingSource is inside the specific data structs now
                 let data: ItineraryEventDataType
-                // translations, attachments, weather are handled client-side
             }
             
             --- Important Notes ---
-            1. All dates should be in ISO 8601 format (e.g., "YYYY-MM-DDTHH:mm:ssZ").
-            2. Set `id` as a new UUID string (e.g., UUID().uuidString).
+            1. **CRITICAL - DATES & TIMEZONES:**
+               - Do NOT default to "Z" (UTC) unless the time is explicitly stated as UTC.
+               - Infer the correct **Timezone Offset** based on the location (e.g., Tokyo is +09:00, New York is -05:00).
+               - Return dates in ISO 8601 format with the correct offset.
+               - Example (Tokyo 2:30 PM): "2026-01-20T14:30:00+09:00" (CORRECT) vs "2026-01-20T14:30:00Z" (WRONG).
+            2. Set `id` as a new UUID string.
             3. Infer `type` from the event data.
-            4. Populate `startTime` and `endTime` from the specific event data (e.g., flight.departureTime, flight.arrivalTime).
-            5. Omit fields not found in the source content. Provide `nil` for optional fields if data is not available.
-            6. Return an empty array `[]` if no travel events are detected.
-            7. Only return the JSON array. Do not include any other text or formatting outside the JSON.
-            8. The `data` field in `TravelEvent` should wrap the specific data (e.g., `{"flight": {"airline": "Delta", "bookingSource": {"name": "Expedia"}, ...}}`).
-            9. Do not use Markdown formatting. Just return the raw JSON array string.
+            4. For Trains, separate `serviceProvider` (operator) from `bookingSource` (agency).
+            5. Return JSON array only.
             
             Please parse the following content into a JSON array of `TravelEvent` objects:
             
@@ -231,8 +218,6 @@ class GeminiAPIClient {
             """
         }
     
-    // MODIFIED: Decoding is paused for debugging
-    // ✅ CRASH-PROOF EXTRACTOR
         private func extractEventsFromResponse(response: GenerateContentResponse) throws -> [TravelEvent] {
             guard let textPart = response.text else {
                 print("DEBUG: Gemini response.text is nil.")
@@ -241,70 +226,60 @@ class GeminiAPIClient {
             
             print("🔍 RAW GEMINI RESPONSE: \(textPart)")
 
-            // 1. SAFE CLEANUP (No Dangerous Slicing)
-            // We clean the string by replacing known Markdown patterns.
-            // This avoids the "String index is out of bounds" crash entirely.
+            // 1. SAFE CLEANUP
             var jsonString = textPart
                 .replacingOccurrences(of: "```json", with: "")
                 .replacingOccurrences(of: "```", with: "")
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             
-            // 2. Locate the Array Brackets Safely
-            // Only slice if we find a valid opening '[' and closing ']'
             if let firstBracket = jsonString.firstIndex(of: "["),
                let lastBracket = jsonString.lastIndex(of: "]"),
                firstBracket < lastBracket {
-                // Safe Swift slicing
                 jsonString = String(jsonString[firstBracket...lastBracket])
             }
-            
-            print("✅ CLEANED JSON: \(jsonString)")
             
             guard let jsonData = jsonString.data(using: .utf8) else {
                 throw GeminiAPIError.decodingError(NSError(domain: "DataError", code: 0, userInfo: [NSLocalizedDescriptionKey: "Failed to convert cleaned JSON string to Data"]))
             }
             
-            // 3. ROBUST DECODER
+            // 2. ROBUST DATE DECODING
             let decoder = JSONDecoder()
-            
-            // Custom Date Strategy to handle "2024-07-17T10:15:00+08:00" AND "2024-07-17"
             let formatter = DateFormatter()
             formatter.calendar = Calendar(identifier: .iso8601)
             formatter.locale = Locale(identifier: "en_US_POSIX")
-            formatter.timeZone = TimeZone(secondsFromGMT: 0)
+            // Note: We do NOT set timeZone here. We let the offset in the string dictate the time.
             
             decoder.dateDecodingStrategy = .custom { decoder -> Date in
                 let container = try decoder.singleValueContainer()
                 let dateStr = try container.decode(String.self)
                 
-                // Format 1: Full ISO with Timezone (e.g. from your logs)
+                // Format 1: ISO with Timezone Offset (e.g. 2026-01-20T14:30:00+09:00) - PREFERRED
+                formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssXXXXX"
+                if let date = formatter.date(from: dateStr) { return date }
+                
+                // Format 2: ISO with 'Z' (e.g. 2026-01-20T14:30:00Z)
                 formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
                 if let date = formatter.date(from: dateStr) { return date }
                 
-                // Format 2: ISO with milliseconds
+                // Format 3: ISO with milliseconds
                 formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
                 if let date = formatter.date(from: dateStr) { return date }
                 
-                // Format 3: Simple Date (Fallback)
+                // Format 4: ISO Local Time (No Offset) -> Treat as UTC to avoid crash, but warn
+                formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+                formatter.timeZone = TimeZone(secondsFromGMT: 0)
+                if let date = formatter.date(from: dateStr) { return date }
+                
+                // Format 5: Simple Date
                 formatter.dateFormat = "yyyy-MM-dd"
                 if let date = formatter.date(from: dateStr) { return date }
                 
-                print("⚠️ Date decoding failed for: \(dateStr)")
-                throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid date format")
+                print("⚠️ Date parsing failed for: \(dateStr)")
+                throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid date format: \(dateStr)")
             }
 
-            // 4. Decode & Return
             do {
                 return try decoder.decode([TravelEvent].self, from: jsonData)
-            } catch let DecodingError.dataCorrupted(context) {
-                print("❌ Decoding Error (Data Corrupted): \(context.debugDescription)")
-                throw GeminiAPIError.decodingError(DecodingError.dataCorrupted(context))
-            } catch let DecodingError.keyNotFound(key, context) {
-                print("❌ Decoding Error (Missing Key): '\(key.stringValue)'")
-                throw GeminiAPIError.decodingError(DecodingError.keyNotFound(key, context))
-            } catch let DecodingError.typeMismatch(type, context) {
-                print("❌ Decoding Error (Type Mismatch): Expected \(type) but found something else at \(context.codingPath)")
-                throw GeminiAPIError.decodingError(DecodingError.typeMismatch(type, context))
             } catch {
                 print("❌ Generic Decoding Error: \(error)")
                 throw GeminiAPIError.decodingError(error)
@@ -318,55 +293,33 @@ class GeminiAPIClient {
         do {
             let response = try await textModel.generateContent(promptText)
             return try extractEventsFromResponse(response: response)
-        } catch let error { // Capture generic error here
-            print("DEBUG: Error in parseText: \(error)")
-            if let nsError = error as? NSError {
-                print("DEBUG: NSError domain: \(nsError.domain), code: \(nsError.code), userInfo: \(nsError.userInfo)")
-                if nsError.domain == "com.firebase.generativeai" {
-                    throw GeminiAPIError.firebaseError(nsError)
-                }
+        } catch let error {
+            if let nsError = error as? NSError, nsError.domain == "com.firebase.generativeai" {
+                throw GeminiAPIError.firebaseError(nsError)
             }
             throw GeminiAPIError.networkError(error)
         }
     }
     
     func parseImage(_ image: UIImage) async throws -> [TravelEvent] {
-        // Simplified prompt for multimodal input, just using the core instruction part
         let basePrompt = generatePrompt(for: "")
         let fullPrompt = "This is an image of a travel itinerary. \(basePrompt)"
-        
         do {
             let response = try await visionModel.generateContent(image, fullPrompt)
             return try extractEventsFromResponse(response: response)
-        } catch let error { // Capture generic error here
-            print("DEBUG: Error in parseImage: \(error)")
-            if let nsError = error as? NSError {
-                print("DEBUG: NSError domain: \(nsError.domain), code: \(nsError.code), userInfo: \(nsError.userInfo)")
-                if nsError.domain == "com.firebase.generativeai" {
-                    throw GeminiAPIError.firebaseError(nsError)
-                }
-            }
+        } catch let error {
             throw GeminiAPIError.networkError(error)
         }
     }
 
     func parsePDF(_ pdfData: Data) async throws -> [TravelEvent] {
-        // Simplified prompt for multimodal input, just using the core instruction part
         let basePrompt = generatePrompt(for: "")
         let fullPrompt = "This is a PDF document of a travel itinerary. \(basePrompt)"
-        
         do {
             let pdfPart = InlineDataPart(data: pdfData, mimeType: "application/pdf")
             let response = try await visionModel.generateContent(pdfPart, fullPrompt)
             return try extractEventsFromResponse(response: response)
-        } catch let error { // Capture generic error here
-            print("DEBUG: Error in parsePDF: \(error)")
-            let nsError = error as NSError
-                print("DEBUG: NSError domain: \(nsError.domain), code: \(nsError.code), userInfo: \(nsError.userInfo)")
-                if nsError.domain == "com.firebase.generativeai" {
-                    throw GeminiAPIError.firebaseError(nsError)
-                
-            }
+        } catch let error {
             throw GeminiAPIError.networkError(error)
         }
     }

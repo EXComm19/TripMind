@@ -149,8 +149,10 @@ struct EventCardView: View {
 struct FlightCardContent: View {
     let flight: FlightData
     let timeFormatter: DateFormatter
+    
     var body: some View {
         VStack(spacing: 8) {
+            // Header: Airline & Flight Number
             HStack(spacing: 8) {
                 BrandLogoView(brandDomain: flight.brandDomain, fallbackIcon: "airplane", size: 16)
                 Text("\(flight.airline) · \(flight.airlineCode ?? "") \(flight.flightNumber)")
@@ -158,38 +160,70 @@ struct FlightCardContent: View {
                 Spacer()
             }
             .padding(.bottom, 4)
+            
             Divider().overlay(Color.white.opacity(0.3))
+            
+            // Main Flight Info
             HStack(alignment: .top) {
+                // DEPARTURE
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(timeFormatter.string(from: flight.departureTime)).font(.title3).bold().foregroundColor(.primary)
-                    Text(flight.departureCity ?? flight.departureAirport).font(.subheadline).fontWeight(.bold).foregroundColor(.primary)
-                    Text("\(flight.departureAirport) · \(formatTerminal(flight.departureTerminal))").font(.subheadline).fontWeight(.regular).foregroundColor(.secondary)
+                    Text(timeFormatter.string(from: flight.departureTime))
+                        .font(.title3).bold().foregroundColor(.primary)
+                    Text(flight.departureCity ?? flight.departureAirport)
+                        .font(.headline).fontWeight(.bold).foregroundColor(.primary)
+                    
+                    // Optimized Terminal Display: Only show "· T1" if terminal exists
+                    Text(shouldShowTerminal(flight.departureTerminal)
+                         ? "\(flight.departureAirport) · \(formatTerminal(flight.departureTerminal))"
+                         : flight.departureAirport)
+                        .font(.subheadline).fontWeight(.regular).foregroundColor(.secondary)
                 }
+                
                 Spacer()
+                
+                // Duration & Graphic
                 VStack(spacing: 4) {
-                    if let duration = calculateDuration() { Text(duration).font(.caption).foregroundColor(.secondary) }
+                    if let duration = calculateDuration() {
+                        Text(duration).font(.caption).foregroundColor(.secondary)
+                    }
                     HStack(spacing: 0) {
                         Rectangle().fill(Color.gray).frame(height: 3)
-                        Image(systemName: "airplane").font(.system(size: 14, weight: .bold)).foregroundColor(.primary).padding(.horizontal, 4)
+                        Image(systemName: "airplane")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(.primary)
+                            .padding(.horizontal, 4)
                         Rectangle().fill(Color.gray).frame(height: 3)
                     }
                     .frame(width: 140)
                 }
                 .padding(.top, 8)
+                
                 Spacer()
+                
+                // ARRIVAL
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text(timeFormatter.string(from: flight.arrivalTime)).font(.title3).bold().foregroundColor(.primary)
-                    Text(flight.arrivalCity ?? flight.arrivalAirport).font(.subheadline).fontWeight(.bold).foregroundColor(.primary)
-                    Text("\(flight.arrivalAirport) · \(formatTerminal(flight.arrivalTerminal))").font(.subheadline).fontWeight(.regular).foregroundColor(.secondary)
+                    Text(timeFormatter.string(from: flight.arrivalTime))
+                        .font(.title3).bold().foregroundColor(.primary)
+                    Text(flight.arrivalCity ?? flight.arrivalAirport)
+                        .font(.headline).fontWeight(.bold).foregroundColor(.primary)
+                    
+                    // Optimized Terminal Display: Only show "· T1" if terminal exists
+                    Text(shouldShowTerminal(flight.arrivalTerminal)
+                         ? "\(flight.arrivalAirport) · \(formatTerminal(flight.arrivalTerminal))"
+                         : flight.arrivalAirport)
+                        .font(.subheadline).fontWeight(.regular).foregroundColor(.secondary)
                 }
             }
             .padding(.vertical, 4)
+            
+            // Footer: Gate & Check-in
             if flight.departureGate != nil || flight.checkInCounter != nil {
                 Divider().overlay(Color.white.opacity(0.3))
                 HStack {
                     if let gate = flight.departureGate {
                         HStack(spacing: 6) {
-                            Image(systemName: "airplane.departure").font(.callout).foregroundColor(.secondary)
+                            Image(systemName: "airplane.departure")
+                                .font(.callout).foregroundColor(.secondary)
                             Text("Gate:").font(.callout).foregroundColor(.secondary)
                             Text(gate).font(.callout).bold().foregroundColor(.primary)
                         }
@@ -197,7 +231,8 @@ struct FlightCardContent: View {
                     Spacer()
                     if let counter = flight.checkInCounter {
                         HStack(spacing: 6) {
-                            Image(systemName: "person.crop.rectangle").font(.callout).foregroundColor(.secondary)
+                            Image(systemName: "person.crop.rectangle")
+                                .font(.callout).foregroundColor(.secondary)
                             Text("Check-in:").font(.callout).foregroundColor(.secondary)
                             Text(counter).font(.callout).bold().foregroundColor(.primary)
                         }
@@ -207,11 +242,19 @@ struct FlightCardContent: View {
             }
         }
     }
+    
+    // Helper to check if we should display the terminal
+    func shouldShowTerminal(_ term: String?) -> Bool {
+        return term != nil && !term!.isEmpty
+    }
+    
+    // Existing formatting function (Unchanged)
     func formatTerminal(_ term: String?) -> String {
         guard let term = term, !term.isEmpty else { return "T?" }
         if term.uppercased().hasPrefix("T") || term.lowercased().contains("terminal") { return term }
         return "T\(term)"
     }
+    
     func calculateDuration() -> String? {
         let diff = flight.arrivalTime.timeIntervalSince(flight.departureTime)
         if diff > 0 {
@@ -368,7 +411,7 @@ struct CarCardContent: View {
                 Spacer()
                 
                 Text(timeFormatter.string(from: startTime))
-                    .font(.title3).bold()
+                    .font(.system(size: 16)).bold()
                     .foregroundColor(.primary)
             }
             .padding(.bottom, 0)
@@ -393,7 +436,7 @@ struct CarCardContent: View {
                 Spacer()
                 
                 VStack(alignment: .trailing, spacing: 8) {
-                    Image("Car")
+                    Image(CarAssetManager.getCarImage(for: car.carBrand ?? ""))
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 120)
@@ -428,6 +471,34 @@ struct CarCardContent: View {
             .padding(.top, 2)
         }
     }
+
+    struct CarAssetManager {
+        // Define your mapping: Image Name -> Array of Keywords
+        private static let carMapping: [String: [String]] = [
+            "gac_aionS": ["aion s", "埃安S"],
+            "hongqi_eqm5": ["eqm5", "e-qm5"],
+            "byd_qin": ["qin EV", "秦EV"],
+            "byd_qinPlus": ["qin Plus EV", "秦Plus"],
+            "buick_gl8": ["gl8"]
+        ]
+        
+        /// Searches for a car image based on a raw model string
+        static func getCarImage(for modelString: String) -> String {
+            let normalizedInput = modelString.lowercased()
+            
+            // Loop through mapping to find a keyword match
+            for (imageName, keywords) in carMapping {
+                for keyword in keywords {
+                    if normalizedInput.contains(keyword.lowercased()) {
+                        return "carImage/\(imageName)"
+                    }
+                }
+            }
+            
+            // Backup image if no match is found
+            return "carImage/byd_qinPlus"
+        }
+    }
 }
 
 struct RoutePointView: View {
@@ -457,7 +528,7 @@ struct TrainCardContent: View {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(timeFormatter.string(from: train.departureTime)).font(.title3).bold().foregroundColor(.primary)
-                    Text(train.departureStation).font(.subheadline).fontWeight(.bold).foregroundColor(.primary)
+                    Text(train.departureStation).font(.headline).fontWeight(.bold).foregroundColor(.primary)
                 }
                 Spacer()
                 VStack(spacing: 4) {
@@ -473,7 +544,7 @@ struct TrainCardContent: View {
                 Spacer()
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(timeFormatter.string(from: train.arrivalTime)).font(.title3).bold().foregroundColor(.primary)
-                    Text(train.arrivalStation).font(.subheadline).fontWeight(.bold).foregroundColor(.primary)
+                    Text(train.arrivalStation).font(.headline).fontWeight(.bold).foregroundColor(.primary)
                 }
             }
             .padding(.vertical, 4)
