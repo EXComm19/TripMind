@@ -293,6 +293,22 @@ struct TravelEvent: Codable, Identifiable, Hashable {
         self.weather = weather
     }
     
+    // Custom Decoding to handle missing IDs (e.g. from AI) by generating them locally
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString
+        self.type = try container.decode(EventType.self, forKey: .type)
+        self.startTime = try container.decode(Date.self, forKey: .startTime)
+        self.endTime = try container.decodeIfPresent(Date.self, forKey: .endTime)
+        self.geoCoordinates = try container.decodeIfPresent(GeoCoordinates.self, forKey: .geoCoordinates)
+        self.destinationGeoCoordinates = try container.decodeIfPresent(GeoCoordinates.self, forKey: .destinationGeoCoordinates)
+        self.detectedLanguage = try container.decodeIfPresent(String.self, forKey: .detectedLanguage)
+        self.data = try container.decode(ItineraryEventDataType.self, forKey: .data)
+        self.translations = try container.decodeIfPresent([String: TranslatedContent].self, forKey: .translations)
+        self.attachments = try container.decodeIfPresent([Attachment].self, forKey: .attachments)
+        self.weather = try container.decodeIfPresent(WeatherInfo.self, forKey: .weather)
+    }
+    
     var displayTitle: String {
         switch data {
         case .flight(let f): return f.airlineCode != nil ? "\(f.airlineCode!)\(f.flightNumber)" : "\(f.airline) \(f.flightNumber)"
@@ -333,5 +349,22 @@ struct Trip: Identifiable, Codable, Hashable {
         self.startDate = startDate
         self.endDate = endDate
         self.events = events
+        // Auto-calculate dates if events exist on init
+        if !events.isEmpty {
+            updateDatesFromEvents()
+        }
+    }
+    
+    mutating func updateDatesFromEvents() {
+        guard !events.isEmpty else { return }
+        
+        let sortedEvents = events.sorted { $0.startTime < $1.startTime }
+        if let first = sortedEvents.first {
+            self.startDate = first.startTime
+        }
+        
+        // Find the latest end time (or start time if end is nil)
+        let latestDate = events.compactMap { $0.endTime ?? $0.startTime }.max()
+        self.endDate = latestDate
     }
 }

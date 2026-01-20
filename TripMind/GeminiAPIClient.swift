@@ -189,7 +189,7 @@ class GeminiAPIClient {
             }
 
             struct TravelEvent: Codable, Identifiable, Hashable {
-                let id: String
+                // id is generated client-side, do not include.
                 let type: EventType
                 let startTime: Date
                 let endTime: Date?
@@ -206,9 +206,12 @@ class GeminiAPIClient {
                - Infer the correct **Timezone Offset** based on the location (e.g., Tokyo is +09:00, New York is -05:00).
                - Return dates in ISO 8601 format with the correct offset.
                - Example (Tokyo 2:30 PM): "2026-01-20T14:30:00+09:00" (CORRECT) vs "2026-01-20T14:30:00Z" (WRONG).
-            2. Set `id` as a new UUID string.
-            3. Infer `type` from the event data.
-            4. For Trains, separate `serviceProvider` (operator) from `bookingSource` (agency).
+            2. Infer `type` from the event data.
+            3. For Trains, separate `serviceProvider` (operator) from `bookingSource` (agency).
+            4. **MANDATORY**: Aggressively extract `bookingSource` information.
+               - If the email/document is from "Trip.com", "Expedia", "Booking.com", etc., set that as the `bookingSource`.
+               - If directly from an airline/hotel, set the airline/hotel name.
+               - Do NOT leave `bookingSource` empty if there is ANY clue about the sender or agency.
             5. Return JSON array only.
             
             Please parse the following content into a JSON array of `TravelEvent` objects:

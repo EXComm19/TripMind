@@ -41,6 +41,10 @@ struct TripListView: View {
     @State private var tripToExport: TripDocument?
     @State private var importError: String?
     
+    // Edit State
+    @State private var tripToEdit: Trip?
+    @State private var editTripName: String = ""
+    
     // Search State
     @State private var searchText = ""
     @FocusState private var isSearchFocused: Bool
@@ -241,12 +245,24 @@ struct TripListView: View {
                                             isExporting = true
                                         } label: { Label("Export", systemImage: "square.and.arrow.up") }
                                         .tint(.blue)
+                                        
+                                        Button {
+                                            tripToEdit = trip
+                                            editTripName = trip.name
+                                        } label: { Label("Edit", systemImage: "pencil") }
+                                        .tint(.orange)
                                     }
                                     .contextMenu {
                                         Button {
                                             tripToExport = TripDocument(trip: trip)
                                             isExporting = true
                                         } label: { Label("Export JSON", systemImage: "square.and.arrow.up") }
+                                        
+                                        Button {
+                                            tripToEdit = trip
+                                            editTripName = trip.name
+                                        } label: { Label("Edit", systemImage: "pencil") }
+                                        
                                         Button(role: .destructive) {
                                             Task { try? await tripStore.deleteTrip(id: trip.id) }
                                         } label: { Label("Delete", systemImage: "trash") }
@@ -295,6 +311,28 @@ struct TripListView: View {
                         ToolbarItem(placement: .confirmationAction) {
                             Button("Create") { addNewTrip(); showingAddTripSheet = false }
                             .disabled(newTripName.isEmpty)
+                        }
+                    }
+                }
+                .presentationDetents([.height(200)])
+
+            }
+            .sheet(item: $tripToEdit) { trip in
+                NavigationStack {
+                    Form {
+                        TextField("Trip Name", text: $editTripName)
+                    }
+                    .navigationTitle("Edit Trip")
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) { Button("Cancel") { tripToEdit = nil } }
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Save") {
+                                var updatedTrip = trip
+                                updatedTrip.name = editTripName
+                                Task { try? await tripStore.updateTrip(updatedTrip) }
+                                tripToEdit = nil
+                            }
+                            .disabled(editTripName.isEmpty)
                         }
                     }
                 }

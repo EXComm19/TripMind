@@ -41,6 +41,8 @@ struct EventCardView: View {
                     contentView
                 } else if isTrainEvent {
                     contentView
+                } else if isHotelEvent {
+                    contentView
                 } else {
                     // Generic Header for others
                     HStack(alignment: .center, spacing: 12) {
@@ -273,111 +275,152 @@ struct HotelCardContent: View {
     let dateFormatter: DateFormatter
     
     var body: some View {
-        HStack(alignment: .top, spacing: 0) {
+        VStack(alignment: .leading, spacing: 16) {
             
-            // COL 1: CHECK-IN
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 4) {
-                    Image(systemName: "calendar")
-                        .font(.caption)
+            // ROW 1: HEADER (Logo + Name)
+            HStack(alignment: .center, spacing: 12) {
+                BrandLogoView(
+                    brandDomain: hotel.brandDomain,
+                    fallbackIcon: "bed.double",
+                    size: 32 // Slightly larger for hotel brand
+                )
+                
+                Text(hotel.hotelName)
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .foregroundColor(.primary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                
+                Spacer()
+            }
+            
+            // ROW 2: TIMELINE (Check-in -> Nights -> Check-out)
+            HStack(alignment: .center) {
+                // Check-in
+                VStack(alignment: .leading, spacing: 4) {
                     Text("CHECK-IN")
-                        .font(.caption2).fontWeight(.bold)
+                        .font(.caption2).fontWeight(.bold).foregroundColor(.secondary)
+                    if let checkIn = hotel.checkInTime {
+                        Text(dateFormatter.string(from: checkIn).uppercased())
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundColor(.primary)
+                        Text(timeFormatter.string(from: checkIn))
+                            .font(.caption).foregroundColor(.secondary)
+                    }
                 }
-                .foregroundColor(.secondary)
                 
-                if let checkIn = hotel.checkInTime {
-                    // ✅ Date: Decreased to .headline (was .title3)
-                    Text(dateFormatter.string(from: checkIn).uppercased())
-                        .font(.headline)
-                        .fontWeight(.bold)
-                        .foregroundColor(.primary)
+                Spacer()
+                
+                // Duration Graphic
+                VStack(spacing: 4) {
+                    Text(getNightsString())
+                        .font(.caption).fontWeight(.bold)
+                        .foregroundColor(.white)
                     
-                    Text(timeFormatter.string(from: checkIn))
-                        .font(.subheadline)
-                        .fontWeight(.bold)
-                        .foregroundColor(.primary)
+                    HStack(spacing: 0) {
+                        Circle().fill(Color.white).frame(width: 6, height: 6)
+                        Rectangle().fill(Color.white.opacity(0.3)).frame(height: 2)
+                        Image(systemName: "moon.stars.fill")
+                            .font(.caption2)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 4)
+                        Rectangle().fill(Color.white.opacity(0.3)).frame(height: 2)
+                        Circle().fill(Color.white).frame(width: 6, height: 6)
+                    }
+                    .frame(width: 100)
                 }
-            }
-            .frame(width: 90, alignment: .leading)
-            
-            Rectangle()
-                .fill(Color.gray.opacity(0.3))
-                .frame(width: 1)
-                .padding(.horizontal, 10)
-            
-            // COL 2: CHECK-OUT
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 4) {
-                    Image(systemName: "calendar")
-                        .font(.caption)
+                
+                Spacer()
+                
+                // Check-out
+                VStack(alignment: .trailing, spacing: 4) {
                     Text("CHECK-OUT")
-                        .font(.caption2).fontWeight(.bold)
-                }
-                .foregroundColor(.secondary)
-                
-                if let checkOut = hotel.checkOutTime {
-                    // ✅ Date: Decreased to .headline
-                    Text(dateFormatter.string(from: checkOut).uppercased())
-                        .font(.headline)
-                        .fontWeight(.bold)
-                        .foregroundColor(.primary)
-                    
-                    Text(timeFormatter.string(from: checkOut))
-                        .font(.subheadline)
-                        .fontWeight(.bold)
-                        .foregroundColor(.primary)
-                }
-            }
-            .frame(width: 90, alignment: .leading)
-            
-            Rectangle()
-                .fill(Color.gray.opacity(0.3))
-                .frame(width: 1)
-                .padding(.horizontal, 10)
-            
-            // COL 3: DETAILS
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .top, spacing: 6) {
-                    Image(systemName: "moon.fill")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("DURATION")
-                            .font(.caption2).fontWeight(.bold).foregroundColor(.secondary)
-                        Text(getNightsString())
-                            .font(.subheadline).fontWeight(.bold).foregroundColor(.primary)
+                        .font(.caption2).fontWeight(.bold).foregroundColor(.secondary)
+                    if let checkOut = hotel.checkOutTime {
+                        Text(dateFormatter.string(from: checkOut).uppercased())
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundColor(.primary)
+                        Text(timeFormatter.string(from: checkOut))
+                            .font(.caption).foregroundColor(.secondary)
                     }
                 }
-                
+            }
+            .padding(.vertical, 4)
+            
+            // ROW 3: TAGS (Room Type, Breakfast, etc.)
+            FlowLayout(spacing: 8) {
                 if let room = hotel.roomType, !room.isEmpty {
-                    HStack(alignment: .top, spacing: 6) {
-                        Image(systemName: "bed.double.fill")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("ROOM TYPE")
-                                .font(.caption2).fontWeight(.bold).foregroundColor(.secondary)
-                            Text(room.uppercased())
-                                .font(.caption).fontWeight(.bold)
-                                .foregroundColor(.primary)
-                                .lineLimit(2)
-                        }
-                    }
+                    TagView(icon: "bed.double.fill", text: room, color: .blue)
+                }
+                
+                if let breakfast = hotel.isBreakfastIncluded, breakfast {
+                    TagView(icon: "cup.and.saucer.fill", text: "Breakfast Included", color: .orange)
+                }
+                
+                if let extras = hotel.extraIncluded, !extras.isEmpty {
+                    TagView(icon: "star.fill", text: "Extras", color: .purple)
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.top, 4)
     }
     
     func getNightsString() -> String {
         if !hotel.numberOfNights.isEmpty {
-            return hotel.numberOfNights.uppercased()
+            return "\(hotel.numberOfNights) NIGHTS"
         } else if let checkIn = hotel.checkInTime, let checkOut = hotel.checkOutTime {
             let nights = Calendar.current.dateComponents([.day], from: checkIn, to: checkOut).day ?? 0
             return "\(nights) NIGHTS"
         }
         return ""
+    }
+}
+
+// Helper Views for Tags
+struct TagView: View {
+    let icon: String
+    let text: String
+    let color: Color
+    
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.caption2)
+            Text(text)
+                .font(.caption)
+                .fontWeight(.medium)
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 10)
+        .background(color.opacity(0.1))
+        .foregroundColor(color)
+        .clipShape(Capsule())
+    }
+}
+
+// Simple FlowLayout implementation (if iOS 16+ use Layout, else HStack wrapper)
+// Since target is iOS 16+, we can use a wrapped HStack equivalent or just standard wrapping.
+// For simplicity in this snippet, using a scrollable HStack if flow is complex,
+// but let's stick to a wrapped layout logic or just an HStack if items are few.
+// UPDATED: Using a simple HStack for now as usually only 2-3 tags.
+struct FlowLayout: View {
+    let spacing: CGFloat
+    let content: () -> any View
+    
+    init(spacing: CGFloat = 8, @ViewBuilder content: @escaping () -> any View) {
+        self.spacing = spacing
+        self.content = content
+    }
+    
+    var body: some View {
+         // Fallback to simple HStack for now to ensure compilation,
+         // as true FlowLayout requires more code.
+         ScrollView(.horizontal, showsIndicators: false) {
+             HStack(spacing: spacing) {
+                 AnyView(content())
+             }
+         }
     }
 }
 
@@ -436,7 +479,7 @@ struct CarCardContent: View {
                 Spacer()
                 
                 VStack(alignment: .trailing, spacing: 8) {
-                    Image(CarAssetManager.getCarImage(for: car.carBrand ?? ""))
+                    Image(CarAssetManager.getCarImage(for: car.carBrand ?? "", serviceType: car.serviceType))
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 120)
@@ -479,11 +522,15 @@ struct CarCardContent: View {
             "hongqi_eqm5": ["eqm5", "e-qm5"],
             "byd_qin": ["qin EV", "秦EV"],
             "byd_qinPlus": ["qin Plus EV", "秦Plus"],
-            "buick_gl8": ["gl8"]
+            "buick_gl8": ["gl8"],
+            "byd_han": ["han", "汉"],
+            "voyah_dreamer": ["dreamer", "梦想家"],
+            "gac_aionY": ["aion Y", "埃安Y"],
+            "benz_eclass": ["E级","E300L","E260L", "E300", "E260"]
         ]
         
         /// Searches for a car image based on a raw model string
-        static func getCarImage(for modelString: String) -> String {
+        static func getCarImage(for modelString: String, serviceType: String? = nil) -> String {
             let normalizedInput = modelString.lowercased()
             
             // Loop through mapping to find a keyword match
@@ -492,6 +539,17 @@ struct CarCardContent: View {
                     if normalizedInput.contains(keyword.lowercased()) {
                         return "carImage/\(imageName)"
                     }
+                }
+            }
+            
+            // Backup logic based on Service Type
+            if let service = serviceType?.lowercased() {
+                if service.contains("六座专车") || service.contains("商务车") || service.contains("商务") || service.contains("六座") || service.contains("mpv") || service.contains("商务mpv") || service.contains("six-seater") || service.contains("six-seater mpv") || service.contains("business") {
+                    return "carImage/voyah_dreamer"
+                } else if service.contains("专车") || service.contains("premier") || service.contains("舒适型") || service.contains("comfort") || service.contains("轻享") {
+                    return "carImage/byd_han"
+                } else if service.contains("豪华") || service.contains("luxe") || service.contains("luxury") || service.contains("lux") {
+                    return "carImage/benz_eclass"
                 }
             }
             

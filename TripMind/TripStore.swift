@@ -87,6 +87,7 @@ class TripStore: ObservableObject {
         if newTrip.id.isEmpty {
             newTrip.id = UUID().uuidString
         }
+        newTrip.updateDatesFromEvents() // Auto-update dates
         self.trips.append(newTrip)
         // didSet will call saveTrips()
         print("Added trip: \(newTrip.name)")
@@ -96,7 +97,9 @@ class TripStore: ObservableObject {
         // Find the index of the trip to update
         if let index = trips.firstIndex(where: { $0.id == trip.id }) {
             // Replace the existing trip with the updated one
-            self.trips[index] = trip
+            var updatedTrip = trip
+            updatedTrip.updateDatesFromEvents() // Auto-update dates
+            self.trips[index] = updatedTrip
             // didSet will call saveTrips()
             print("Updated trip: \(trip.name)")
         } else {

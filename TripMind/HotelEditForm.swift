@@ -98,16 +98,11 @@ struct HotelEditForm: View {
                     .onChange(of: brandDomainText) { _, newValue in hotelData.brandDomain = newValue.isEmpty ? nil : newValue }
                 
                 TextField("Source Name", text: $bookingSourceName)
-                                    .onChange(of: bookingSourceName) { _, val in
-                                        updateBookingSource(name: val, domain: bookingSourceDomain)
-                                    }
-                                
-                                TextField("Source Domain", text: $bookingSourceDomain)
-                                    .keyboardType(.URL)
-                                    .autocapitalization(.none)
-                                    .onChange(of: bookingSourceDomain) { _, val in
-                                        updateBookingSource(name: bookingSourceName, domain: val)
-                                    }
+                    .onChange(of: bookingSourceName) { _, val in hotelData.bookingSource?.name = val.isEmpty ? nil : val }
+                TextField("Source Domain", text: $bookingSourceDomain)
+                    .keyboardType(.URL)
+                    .autocapitalization(.none)
+                    .onChange(of: bookingSourceDomain) { _, val in hotelData.bookingSource?.domain = val.isEmpty ? nil : val }
             }
         }
         .onAppear { initializeState() }
@@ -136,17 +131,5 @@ struct HotelEditForm: View {
             hotelData.fare = TravelFare(currency: fareCurrencyText, amount: fareAmount ?? 0.0)
         }
     }
-    
-    private func updateBookingSource(name: String, domain: String) {
-            if name.isEmpty && domain.isEmpty {
-                hotelData.bookingSource = nil
-                return
-            }
-            if hotelData.bookingSource == nil {
-                hotelData.bookingSource = BookingSource(name: nil, domain: nil, isOTA: nil)
-            }
-            hotelData.bookingSource?.name = name.isEmpty ? nil : name
-            hotelData.bookingSource?.domain = domain.isEmpty ? nil : domain
-        }
 }
 
