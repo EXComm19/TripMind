@@ -9,7 +9,6 @@ import SwiftUI
 
 struct HotelEditForm: View {
     @Binding var hotelData: HotelData
-    @Binding var bookingSource: BookingSource?
     
     // Local states for optionals
     @State private var bookingNumberText: String = ""
@@ -98,13 +97,17 @@ struct HotelEditForm: View {
                     .autocapitalization(.none)
                     .onChange(of: brandDomainText) { _, newValue in hotelData.brandDomain = newValue.isEmpty ? nil : newValue }
                 
-                TextField("Booking Source Name", text: $bookingSourceName)
-                    .onChange(of: bookingSourceName) { _, _ in updateBookingSource() }
-                
-                TextField("Booking Source Domain", text: $bookingSourceDomain)
-                    .keyboardType(.URL)
-                    .autocapitalization(.none)
-                    .onChange(of: bookingSourceDomain) { _, _ in updateBookingSource() }
+                TextField("Source Name", text: $bookingSourceName)
+                                    .onChange(of: bookingSourceName) { _, val in
+                                        updateBookingSource(name: val, domain: bookingSourceDomain)
+                                    }
+                                
+                                TextField("Source Domain", text: $bookingSourceDomain)
+                                    .keyboardType(.URL)
+                                    .autocapitalization(.none)
+                                    .onChange(of: bookingSourceDomain) { _, val in
+                                        updateBookingSource(name: bookingSourceName, domain: val)
+                                    }
             }
         }
         .onAppear { initializeState() }
@@ -119,8 +122,8 @@ struct HotelEditForm: View {
         extraIncludedText = hotelData.extraIncluded ?? ""
         hasBreakfast = hotelData.isBreakfastIncluded ?? false
         
-        bookingSourceName = bookingSource?.name ?? ""
-        bookingSourceDomain = bookingSource?.domain ?? ""
+        bookingSourceName = hotelData.bookingSource?.name ?? ""
+        bookingSourceDomain = hotelData.bookingSource?.domain ?? ""
         
         fareCurrencyText = hotelData.fare?.currency ?? ""
         fareAmount = hotelData.fare?.amount
@@ -134,12 +137,16 @@ struct HotelEditForm: View {
         }
     }
     
-    private func updateBookingSource() {
-        if bookingSourceName.isEmpty && bookingSourceDomain.isEmpty {
-            bookingSource = nil
-        } else {
-            bookingSource = BookingSource(name: bookingSourceName, domain: bookingSourceDomain, isOTA: bookingSource?.isOTA)
+    private func updateBookingSource(name: String, domain: String) {
+            if name.isEmpty && domain.isEmpty {
+                hotelData.bookingSource = nil
+                return
+            }
+            if hotelData.bookingSource == nil {
+                hotelData.bookingSource = BookingSource(name: nil, domain: nil, isOTA: nil)
+            }
+            hotelData.bookingSource?.name = name.isEmpty ? nil : name
+            hotelData.bookingSource?.domain = domain.isEmpty ? nil : domain
         }
-    }
 }
 

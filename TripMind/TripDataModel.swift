@@ -54,7 +54,7 @@ struct GeoCoordinates: Codable, Hashable {
 }
 
 struct BookingSource: Codable, Hashable {
-    var name: String
+    var name: String?
     var domain: String?
     var isOTA: Bool?
 }
@@ -130,11 +130,13 @@ struct FlightData: Codable, Hashable {
     var etkt: String?
     var fare: TravelFare?
     
+    var bookingSource: BookingSource?
     var baggage: [BaggageItem]?
 }
 
 struct TrainData: Codable, Hashable {
-    var serviceProvider: String?
+    var trainOperator: String?
+    var brandDomain: String?
     var trainNumber: String?
     var passenger: String?
     var travelClass: String?
@@ -148,10 +150,14 @@ struct TrainData: Codable, Hashable {
     var arrivalCountry: String?
     var arrivalCountryCode: String?
     var arrivalTime: Date
+    
+    var bookingSource: BookingSource?
     var fare: TravelFare?
 }
 
 struct CarData: Codable, Hashable {
+    var serviceProvider: String?
+    var brandDomain: String?
     var origin: String
     var departureCountry: String?
     var departureCountryCode: String?
@@ -165,6 +171,8 @@ struct CarData: Codable, Hashable {
     var carColor: String?
     var carBrand: String?
     var serviceType: String? // ✅ Added: e.g. "Airport Pickup", "Ride Share"
+    
+    var bookingSource: BookingSource?
     var fare: TravelFare?
 }
 
@@ -179,9 +187,11 @@ struct HotelData: Codable, Hashable {
     var guestName: String?
     var roomType: String?
     var numberOfNights: String
-    var fare: TravelFare?
     var isBreakfastIncluded: Bool?
     var extraIncluded: String?
+    
+    var bookingSource: BookingSource?
+    var fare: TravelFare?
 }
 
 struct OtherData: Codable, Hashable {
@@ -189,6 +199,8 @@ struct OtherData: Codable, Hashable {
     var description: String?
     var location: String?
     var time: String?
+    
+    var bookingSource: BookingSource?
     var fare: TravelFare?
 }
 
@@ -261,7 +273,6 @@ struct TravelEvent: Codable, Identifiable, Hashable {
     var geoCoordinates: GeoCoordinates?
     var destinationGeoCoordinates: GeoCoordinates?
     var detectedLanguage: String?
-    var bookingSource: BookingSource?
     
     var data: ItineraryEventDataType
     var translations: [String: TranslatedContent]?
@@ -276,7 +287,6 @@ struct TravelEvent: Codable, Identifiable, Hashable {
         self.geoCoordinates = geoCoordinates
         self.destinationGeoCoordinates = destinationGeoCoordinates
         self.detectedLanguage = detectedLanguage
-        self.bookingSource = bookingSource
         self.data = data
         self.translations = translations
         self.attachments = attachments
@@ -287,7 +297,7 @@ struct TravelEvent: Codable, Identifiable, Hashable {
         switch data {
         case .flight(let f): return f.airlineCode != nil ? "\(f.airlineCode!)\(f.flightNumber)" : "\(f.airline) \(f.flightNumber)"
         case .hotel(let h): return h.hotelName
-        case .train(let t): return "\(t.serviceProvider ?? "Train") \(t.trainNumber ?? "")"
+        case .train(let t): return "\(t.trainOperator ?? "Train") \(t.trainNumber ?? "")"
         case .car(let c): return c.carBrand ?? "Ride"
         case .other(let o): return o.title
         }

@@ -39,8 +39,10 @@ struct EventCardView: View {
                     contentView
                 } else if isCarEvent {
                     contentView
+                } else if isTrainEvent {
+                    contentView
                 } else {
-                    // Generic Header for others (Hotel, Train)
+                    // Generic Header for others
                     HStack(alignment: .center, spacing: 12) {
                         BrandLogoView(
                             brandDomain: getBrandDomain(),
@@ -95,7 +97,7 @@ struct EventCardView: View {
         case .car(let car):
             CarCardContent(
                 car: car,
-                bookingSource: event.bookingSource,
+                bookingSource: car.bookingSource,
                 startTime: event.startTime,
                 timeFormatter: timeFormatter
             )
@@ -111,12 +113,14 @@ struct EventCardView: View {
         case .flight(let f): return "\(f.airlineCode ?? "") \(f.flightNumber)"
         case .hotel(let h): return h.hotelName
         case .car(let c): return c.carBrand ?? "Ride"
+        case .train(let t): return "\(t.trainOperator ?? "") \(t.trainNumber)"
         default: return event.displayTitle
         }
     }
     
     var isCarEvent: Bool { if case .car = event.data { return true } else { return false } }
     var isFlightEvent: Bool { if case .flight = event.data { return true } else { return false } }
+    var isTrainEvent: Bool { if case .train = event.data { return true } else { return false } }
     var isHotelEvent: Bool { if case .hotel = event.data { return true } else { return false } }
     
     var eventTypeColor: Color {
@@ -133,6 +137,8 @@ struct EventCardView: View {
         switch event.data {
         case .flight(let f): return f.brandDomain
         case .hotel(let h): return h.brandDomain
+        case .car(let c): return c.brandDomain
+        case .train(let t): return t.brandDomain
         default: return nil
         }
     }
@@ -147,17 +153,17 @@ struct FlightCardContent: View {
         VStack(spacing: 8) {
             HStack(spacing: 8) {
                 BrandLogoView(brandDomain: flight.brandDomain, fallbackIcon: "airplane", size: 16)
-                Text("\(flight.airline) • \(flight.airlineCode ?? "") \(flight.flightNumber)")
-                    .font(.subheadline).fontWeight(.regular).foregroundColor(.secondary)
+                Text("\(flight.airline) · \(flight.airlineCode ?? "") \(flight.flightNumber)")
+                    .font(.system(size: 16, weight: .regular))
                 Spacer()
             }
-            .padding(.bottom, 0)
+            .padding(.bottom, 4)
             Divider().overlay(Color.white.opacity(0.3))
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(timeFormatter.string(from: flight.departureTime)).font(.title3).bold().foregroundColor(.primary)
                     Text(flight.departureCity ?? flight.departureAirport).font(.subheadline).fontWeight(.bold).foregroundColor(.primary)
-                    Text("\(flight.departureAirport) • \(formatTerminal(flight.departureTerminal))").font(.subheadline).fontWeight(.regular).foregroundColor(.secondary)
+                    Text("\(flight.departureAirport) · \(formatTerminal(flight.departureTerminal))").font(.subheadline).fontWeight(.regular).foregroundColor(.secondary)
                 }
                 Spacer()
                 VStack(spacing: 4) {
@@ -174,7 +180,7 @@ struct FlightCardContent: View {
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(timeFormatter.string(from: flight.arrivalTime)).font(.title3).bold().foregroundColor(.primary)
                     Text(flight.arrivalCity ?? flight.arrivalAirport).font(.subheadline).fontWeight(.bold).foregroundColor(.primary)
-                    Text("\(flight.arrivalAirport) • \(formatTerminal(flight.arrivalTerminal))").font(.subheadline).fontWeight(.regular).foregroundColor(.secondary)
+                    Text("\(flight.arrivalAirport) · \(formatTerminal(flight.arrivalTerminal))").font(.subheadline).fontWeight(.regular).foregroundColor(.secondary)
                 }
             }
             .padding(.vertical, 4)
@@ -344,17 +350,17 @@ struct CarCardContent: View {
             // 1. HEADER: Provider + Logo + Time
             HStack(alignment: .center, spacing: 10) {
                 BrandLogoView(
-                    brandDomain: bookingSource?.domain,
+                    brandDomain: car.brandDomain,
                     fallbackIcon: "car",
                     size: 16
                 )
                 
-                let provider = bookingSource?.name.uppercased() ?? "CAR SERVICE"
+                let provider = car.serviceProvider?.uppercased() ?? "CAR SERVICE"
                 let service = car.serviceType ?? ""
                 let titleText = service.isEmpty ? provider : "\(provider) · \(service)"
                 
                 Text(titleText)
-                    .font(.subheadline)
+                    .font(.system(size: 16))
                     .fontWeight(.regular)
                     .foregroundColor(.secondary)
                     .lineLimit(1)
@@ -439,19 +445,68 @@ struct TrainCardContent: View {
     let train: TrainData
     let timeFormatter: DateFormatter
     var body: some View {
-        HStack {
-            VStack(alignment: .leading) {
-                Text(train.departureStation).font(.headline)
-                Text(timeFormatter.string(from: train.departureTime)).font(.subheadline).foregroundColor(.secondary)
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                BrandLogoView(brandDomain: train.brandDomain, fallbackIcon: "train.side.front.car", size: 16)
+                Text("\(train.trainOperator ?? "Train") · \(train.trainNumber ?? "")")
+                    .font(.system(size: 16, weight: .regular))
+                Spacer()
             }
-            Spacer()
-            Image(systemName: "arrow.right").font(.caption).foregroundColor(.secondary)
-            Spacer()
-            VStack(alignment: .trailing) {
-                Text(train.arrivalStation).font(.headline)
-                Text(timeFormatter.string(from: train.arrivalTime)).font(.subheadline).foregroundColor(.secondary)
-            } 
+            .padding(.bottom, 4)
+            Divider().overlay(Color.white.opacity(0.3))
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(timeFormatter.string(from: train.departureTime)).font(.title3).bold().foregroundColor(.primary)
+                    Text(train.departureStation).font(.subheadline).fontWeight(.bold).foregroundColor(.primary)
+                }
+                Spacer()
+                VStack(spacing: 4) {
+                    if let duration = calculateDuration() { Text(duration).font(.caption).foregroundColor(.secondary) }
+                    HStack(spacing: 0) {
+                        Rectangle().fill(Color.gray).frame(height: 3)
+                        Image(systemName: "train.side.front.car").font(.system(size: 14, weight: .bold)).foregroundColor(.primary).padding(.horizontal, 4)
+                        Rectangle().fill(Color.gray).frame(height: 3)
+                    }
+                    .frame(width: 140)
+                }
+                .padding(.top, 8)
+                Spacer()
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(timeFormatter.string(from: train.arrivalTime)).font(.title3).bold().foregroundColor(.primary)
+                    Text(train.arrivalStation).font(.subheadline).fontWeight(.bold).foregroundColor(.primary)
+                }
+            }
+            .padding(.vertical, 4)
+            if train.seat != nil || train.travelClass != nil {
+                Divider().overlay(Color.white.opacity(0.3))
+                HStack {
+                    if let seat = train.seat {
+                        HStack(spacing: 6) {
+                            Image(systemName: "airplaneseat").font(.callout).foregroundColor(.secondary)
+                            Text(seat).font(.callout).bold().foregroundColor(.primary)
+                        }
+                    }
+                    Spacer()
+                    if let tclass = train.travelClass {
+                        HStack(spacing: 6) {
+                            Image(systemName: "star.circle").font(.callout).foregroundColor(.secondary)
+                            Text(tclass).font(.callout).bold().foregroundColor(.primary)
+                        }
+                    }
+                }
+                .padding(.top, 2)
+            }
+            
         }
-        .foregroundColor(.primary)
+        
+    }
+    func calculateDuration() -> String? {
+        let diff = train.arrivalTime.timeIntervalSince(train.departureTime)
+        if diff > 0 {
+            let h = Int(diff) / 3600
+            let m = Int(diff) % 3600 / 60
+            return "\(h)h \(m)m"
+        }
+        return nil
     }
 }

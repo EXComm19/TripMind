@@ -48,169 +48,188 @@ class GeminiAPIClient {
     }
     
     private func generatePrompt(for content: String) -> String {
-        return """
-        You are an intelligent itinerary parsing assistant. Your task is to extract travel event information from the provided text or image content and return it as a JSON array of structured objects.
-        
-        The JSON output should strictly adhere to the following Swift Codable structs.
-        
-        --- Swift Data Model ---
-        
-        enum EventType: String, Codable, CaseIterable, Identifiable {
-            case flight = "FLIGHT"
-            case hotel = "HOTEL"
-            case train = "TRAIN"
-            case car = "CAR"
-            case other = "OTHER"
-            case transport = "TRANSPORT"
-            case activity = "ACTIVITY"
-            case dining = "DINING"
-        }
+            return """
+            You are an intelligent itinerary parsing assistant. Your task is to extract travel event information from the provided text or image content and return it as a JSON array of structured objects.
+            
+            The JSON output should strictly adhere to the following Swift Codable structs.
+            
+            --- Swift Data Model ---
+            
+            enum EventType: String, Codable, CaseIterable, Identifiable {
+                case flight = "FLIGHT"
+                case hotel = "HOTEL"
+                case train = "TRAIN"
+                case car = "CAR"
+                case other = "OTHER"
+                case transport = "TRANSPORT"
+                case activity = "ACTIVITY"
+                case dining = "DINING"
+            }
 
-        struct GeoCoordinates: Codable, Hashable {
-            let lat: Double
-            let lng: Double
-        }
+            struct GeoCoordinates: Codable, Hashable {
+                let lat: Double
+                let lng: Double
+            }
 
-        struct BookingSource: Codable, Hashable {
-            let name: String
-            let domain: String?
-            let isOTA: Bool?
-        }
+            struct BookingSource: Codable, Hashable {
+                let name: String?
+                let domain: String?
+                let isOTA: Bool?
+            }
 
-        struct TravelFare: Codable, Hashable {
-            let currency: String
-            let amount: Double
-        }
-        
-        struct FlightData: Codable, Hashable {
-            let airline: String
-            let brandDomain: String?
-            let airlineCode: String?
-            let flightNumber: String
-            let confirmationCode: String
-            let passenger: String?
-            let travelClass: String?
-            let departureAirport: String // IATA e.g. "KIX"
-            let departureCountry: String?
-            let departureCountryCode: String?
-            let departureTerminal: String?
-            let departureCity: String? // e.g. "Osaka"
-            let arrivalCity: String?   // e.g. "Guangzhou"
-            let departureGate: String?
-            let checkInDesk: String?
-            let seat: String?
-            let aircraft: String?
-            let aircraftRegistration: String?
-            let departureTime: Date // ISO 8601 format string
-            let arrivalAirport: String // IATA e.g. "CAN"
-            let arrivalCountry: String?
-            let arrivalCountryCode: String?
-            let arrivalTerminal: String?
-            let arrivalTime: Date // ISO 8601 format string
-            let etkt: String?
-            let fare: TravelFare?
-        }
+            struct TravelFare: Codable, Hashable {
+                let currency: String
+                let amount: Double
+            }
+            
+            // MARK: - Specific Data Schemas
+            
+            struct FlightData: Codable, Hashable {
+                let airline: String
+                let brandDomain: String?
+                let airlineCode: String?
+                let flightNumber: String
+                let confirmationCode: String
+                let passenger: String?
+                let travelClass: String?
+                let departureAirport: String // IATA e.g. "KIX"
+                let departureCountry: String?
+                let departureCountryCode: String?
+                let departureTerminal: String?
+                let departureCity: String? // e.g. "Osaka"
+                let arrivalCity: String?   // e.g. "Guangzhou"
+                let departureGate: String?
+                let checkInDesk: String? // Mapped from checkInCounter
+                let seat: String?
+                let aircraft: String?
+                let aircraftRegistration: String?
+                let departureTime: Date // ISO 8601 format string
+                let arrivalAirport: String // IATA e.g. "CAN"
+                let arrivalCountry: String?
+                let arrivalCountryCode: String?
+                let arrivalTerminal: String?
+                let arrivalTime: Date // ISO 8601 format string
+                let etkt: String?
+                let fare: TravelFare?
+                
+                // Moved here:
+                let bookingSource: BookingSource?
+            }
 
-        struct TrainData: Codable, Hashable {
-            let serviceProvider: String?
-            let trainNumber: String?
-            let passenger: String?
-            let travelClass: String?
-            let departureStation: String
-            let departureCountry: String?
-            let departureCountryCode: String?
-            let departureTime: Date // ISO
-            let departureGate: String?
-            let seat: String?
-            let arrivalStation: String
-            let arrivalCountry: String?
-            let arrivalCountryCode: String?
-            let arrivalTime: Date // ISO
-            let fare: TravelFare?
-        }
+            struct TrainData: Codable, Hashable {
+                let trainOperator: String? // Mapped from serviceProvider
+                let brandDomain: String?
+                let trainNumber: String?
+                let passenger: String?
+                let travelClass: String?
+                let departureStation: String
+                let departureCountry: String?
+                let departureCountryCode: String?
+                let departureTime: Date // ISO
+                let departureGate: String?
+                let seat: String?
+                let arrivalStation: String
+                let arrivalCountry: String?
+                let arrivalCountryCode: String?
+                let arrivalTime: Date // ISO
+                let fare: TravelFare?
+                
+                // Moved here:
+                let bookingSource: BookingSource?
+            }
 
-        struct CarData: Codable, Hashable {
-            let origin: String
-            let departureCountry: String?
-            let departureCountryCode: String?
-            let destination: String?
-            let arrivalCountry: String?
-            let arrivalCountryCode: String?
-            let pickupTime: Date // ISO
-            let driver: String?
-            let passenger: String?
-            let carPlate: String?
-            let carColor: String?
-            let carBrand: String?
-            let fare: TravelFare?
-        }
+            struct CarData: Codable, Hashable {
+                let serviceProvider: String?
+                let brandDomain: String?
+                let origin: String
+                let departureCountry: String?
+                let departureCountryCode: String?
+                let destination: String?
+                let arrivalCountry: String?
+                let arrivalCountryCode: String?
+                let pickupTime: Date // ISO
+                let driver: String?
+                let passenger: String?
+                let carPlate: String?
+                let carColor: String?
+                let carBrand: String?
+                let serviceType: String?
+                let fare: TravelFare?
+                
+                // Moved here:
+                let bookingSource: BookingSource?
+            }
 
-        struct HotelData: Codable, Hashable {
-            let hotelName: String
-            let brandDomain: String?
-            let address: String
-            let checkInTime: Date? // ISO
-            let checkOutTime: Date? // ISO
-            let bookingNumber: String?
-            let confirmationNumber: String?
-            let guestName: String?
-            let roomType: String?
-            let numberOfNights: String // Store as string to allow "3 nights" or just "3"
-            let fare: TravelFare?
-            let isBreakfastIncluded: Bool?
-            let extraIncluded: String?
-        }
+            struct HotelData: Codable, Hashable {
+                let hotelName: String
+                let brandDomain: String?
+                let address: String
+                let checkInTime: Date? // ISO
+                let checkOutTime: Date? // ISO
+                let bookingNumber: String?
+                let confirmationNumber: String?
+                let guestName: String?
+                let roomType: String?
+                let numberOfNights: String // Store as string
+                let fare: TravelFare?
+                let isBreakfastIncluded: Bool?
+                let extraIncluded: String?
+                
+                // Moved here:
+                let bookingSource: BookingSource?
+            }
 
-        struct OtherData: Codable, Hashable {
-            let title: String
-            let description: String?
-            let location: String?
-            let time: String? // Keeping as String as it's not strictly ISO and can be flexible
-            let fare: TravelFare?
-            // extraFields: [String: AnyCodable]? - Note: Gemini might not perfectly map arbitrary 'any' fields.
-            // Focus on core fields first, or simplify OtherData for Gemini.
-        }
+            struct OtherData: Codable, Hashable {
+                let title: String
+                let description: String?
+                let location: String?
+                let time: String? 
+                let fare: TravelFare?
+                
+                // Moved here:
+                let bookingSource: BookingSource?
+            }
 
-        enum ItineraryEventDataType: Codable, Hashable {
-            case flight(FlightData)
-            case train(TrainData)
-            case car(CarData)
-            case hotel(HotelData)
-            case other(OtherData)
-        }
+            enum ItineraryEventDataType: Codable, Hashable {
+                case flight(FlightData)
+                case train(TrainData)
+                case car(CarData)
+                case hotel(HotelData)
+                case other(OtherData)
+            }
 
-        struct TravelEvent: Codable, Identifiable, Hashable {
-            let id: String // UUID().uuidString
-            let type: EventType
-            let startTime: Date // ISO
-            let endTime: Date? // ISO
-            let geoCoordinates: GeoCoordinates?
-            let destinationGeoCoordinates: GeoCoordinates? 
-            let detectedLanguage: String?
-            let bookingSource: BookingSource?
-            let data: ItineraryEventDataType
-            // translations and attachments will not be generated by Gemini here.
-            let attachments: [Attachment]?
-            let weather: WeatherInfo?
+            struct TravelEvent: Codable, Identifiable, Hashable {
+                let id: String // UUID().uuidString
+                let type: EventType
+                let startTime: Date // ISO
+                let endTime: Date? // ISO
+                let geoCoordinates: GeoCoordinates?
+                let destinationGeoCoordinates: GeoCoordinates? 
+                let detectedLanguage: String?
+                
+                // NOTE: bookingSource is NO LONGER here. It is inside the 'data' struct.
+                
+                let data: ItineraryEventDataType
+                // translations, attachments, weather are handled client-side
+            }
+            
+            --- Important Notes ---
+            1. All dates should be in ISO 8601 format (e.g., "YYYY-MM-DDTHH:mm:ssZ").
+            2. Set `id` as a new UUID string (e.g., UUID().uuidString).
+            3. Infer `type` from the event data.
+            4. Populate `startTime` and `endTime` from the specific event data (e.g., flight.departureTime, flight.arrivalTime).
+            5. Omit fields not found in the source content. Provide `nil` for optional fields if data is not available.
+            6. Return an empty array `[]` if no travel events are detected.
+            7. Only return the JSON array. Do not include any other text or formatting outside the JSON.
+            8. The `data` field in `TravelEvent` should wrap the specific data (e.g., `{"flight": {"airline": "Delta", "bookingSource": {"name": "Expedia"}, ...}}`).
+            9. Do not use Markdown formatting. Just return the raw JSON array string.
+            
+            Please parse the following content into a JSON array of `TravelEvent` objects:
+            
+            Content:
+            \(content)
+            """
         }
-        
-        --- Important Notes ---
-        1. All dates should be in ISO 8601 format (e.g., "YYYY-MM-DDTHH:mm:ssZ").
-        2. Set `id` as a new UUID string (e.g., UUID().uuidString).
-        3. Infer `type` from the event data.
-        4. Populate `startTime` and `endTime` from the specific event data (e.g., flight.departureTime, flight.arrivalTime).
-        5. Omit fields not found in the source content. Provide `nil` for optional fields if data is not available.
-        6. Return an empty array `[]` if no travel events are detected.
-        7. Only return the JSON array. Do not include any other text or formatting outside the JSON.
-        8. The `data` field in `TravelEvent` should wrap the specific data (e.g., `{"flight": {...}}`).
-        9. Do not use Markdown formatting (like ```json). Just return the raw JSON array string starting with [ and ending with ].
-        
-        Please parse the following content into a JSON array of `TravelEvent` objects:
-        
-        Content:
-        \(content)
-        """
-    }
     
     // MODIFIED: Decoding is paused for debugging
     // ✅ CRASH-PROOF EXTRACTOR

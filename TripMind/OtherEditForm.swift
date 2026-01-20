@@ -9,7 +9,6 @@ import SwiftUI
 
 struct OtherEditForm: View {
     @Binding var otherData: OtherData
-    @Binding var bookingSource: BookingSource?
     
     @State private var descText: String = ""
     @State private var locationText: String = ""
@@ -53,11 +52,16 @@ struct OtherEditForm: View {
             
             Section("System Data") {
                 TextField("Source Name", text: $bookingSourceName)
-                    .onChange(of: bookingSourceName) { _, _ in updateBookingSource() }
-                TextField("Source Domain", text: $bookingSourceDomain)
-                    .keyboardType(.URL)
-                    .autocapitalization(.none)
-                    .onChange(of: bookingSourceDomain) { _, _ in updateBookingSource() }
+                                    .onChange(of: bookingSourceName) { _, val in
+                                        updateBookingSource(name: val, domain: bookingSourceDomain)
+                                    }
+                                
+                                TextField("Source Domain", text: $bookingSourceDomain)
+                                    .keyboardType(.URL)
+                                    .autocapitalization(.none)
+                                    .onChange(of: bookingSourceDomain) { _, val in
+                                        updateBookingSource(name: bookingSourceName, domain: val)
+                                    }
             }
         }
         .onAppear { initializeState() }
@@ -68,8 +72,8 @@ struct OtherEditForm: View {
         locationText = otherData.location ?? ""
         timeText = otherData.time ?? ""
         
-        bookingSourceName = bookingSource?.name ?? ""
-        bookingSourceDomain = bookingSource?.domain ?? ""
+        bookingSourceName = otherData.bookingSource?.name ?? ""
+        bookingSourceDomain = otherData.bookingSource?.domain ?? ""
         
         fareCurrencyText = otherData.fare?.currency ?? ""
         fareAmount = otherData.fare?.amount
@@ -83,11 +87,15 @@ struct OtherEditForm: View {
         }
     }
     
-    private func updateBookingSource() {
-        if bookingSourceName.isEmpty && bookingSourceDomain.isEmpty {
-            bookingSource = nil
-        } else {
-            bookingSource = BookingSource(name: bookingSourceName, domain: bookingSourceDomain, isOTA: bookingSource?.isOTA)
+    private func updateBookingSource(name: String, domain: String) {
+            if name.isEmpty && domain.isEmpty {
+                otherData.bookingSource = nil
+                return
+            }
+            if otherData.bookingSource == nil {
+                otherData.bookingSource = BookingSource(name: nil, domain: nil, isOTA: nil)
+            }
+            otherData.bookingSource?.name = name.isEmpty ? nil : name
+            otherData.bookingSource?.domain = domain.isEmpty ? nil : domain
         }
-    }
 }

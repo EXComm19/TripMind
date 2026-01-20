@@ -9,16 +9,18 @@ import SwiftUI
 
 struct FlightEditForm: View {
     @Binding var flightData: FlightData
-    @Binding var bookingSource: BookingSource?
     
     @State private var airlineCodeText: String = ""
     @State private var brandDomainText: String = ""
     @State private var depCityText: String = ""
     @State private var arrCityText: String = ""
+    
     @State private var bookingSourceName: String = ""
     @State private var bookingSourceDomain: String = ""
+    
     @State private var fareCurrencyText: String = ""
     @State private var fareAmount: Double?
+    
     
     var body: some View {
         Form {
@@ -92,6 +94,12 @@ struct FlightEditForm: View {
                     .keyboardType(.URL)
                     .autocapitalization(.none)
                     .onChange(of: brandDomainText) { _, val in flightData.brandDomain = val.isEmpty ? nil : val }
+                TextField("Source Name", text: $bookingSourceName)
+                    .onChange(of: bookingSourceName) { _, val in flightData.bookingSource?.name = val.isEmpty ? nil : val }
+                TextField("Source Domain", text: $bookingSourceDomain)
+                    .keyboardType(.URL)
+                    .autocapitalization(.none)
+                    .onChange(of: bookingSourceDomain) { _, val in flightData.bookingSource?.domain = val.isEmpty ? nil : val }
             }
         }
         .onAppear { initializeLocalState() }
@@ -102,5 +110,7 @@ struct FlightEditForm: View {
         brandDomainText = flightData.brandDomain ?? ""
         depCityText = flightData.departureCity ?? ""
         arrCityText = flightData.arrivalCity ?? ""
+        bookingSourceName = flightData.bookingSource?.name ?? ""
+        bookingSourceDomain = flightData.bookingSource?.domain ?? ""
     }
 }
